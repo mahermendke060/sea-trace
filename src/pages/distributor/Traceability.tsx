@@ -2,12 +2,25 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Download, Ship, Users, TrendingUp, ArrowRight, Anchor } from "lucide-react";
+import { Search, Download, Ship, Users, Scale, ShoppingCart, ArrowRight } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 
-export default function Traceability() {
+const gradeLabels: Record<string, string> = {
+  culls: "Culls",
+  selects: "Selects",
+  chicks: "Chicks",
+  quarters: "Quarters",
+  halves: "Halves",
+  jumbo: "Jumbo",
+  soft_shell: "Soft Shell",
+  hard_shell: "Hard Shell",
+};
+
+export default function DistributorTraceability() {
   const [purchases, setPurchases] = useState<any[]>([]);
   const [selectedPurchase, setSelectedPurchase] = useState<string>("");
   const [traceData, setTraceData] = useState<any>(null);
@@ -22,7 +35,7 @@ export default function Traceability() {
           vessels(registration_number),
           suppliers(name)
         `)
-        .eq("is_downstream_purchase", false)
+        .eq("is_downstream_purchase", true)
         .order("landing_date", { ascending: false });
       setPurchases(data || []);
     };
@@ -32,7 +45,7 @@ export default function Traceability() {
   const traceProduct = async () => {
     if (!selectedPurchase) return;
 
-    // Get the purchase with all details
+    // Get the purchase with all upstream data
     const { data: purchase } = await supabase
       .from("purchases")
       .select(`
@@ -40,38 +53,53 @@ export default function Traceability() {
         products(species, unit_of_measurement),
         vessels(registration_number, license_number, gear_type),
         suppliers(name, contact_name, contact_email),
-        fishing_zones(name, description)
+        fishing_zones(name, description),
+        sales!purchases_source_sale_id_fkey(
+          sale_date,
+          suppliers(name),
+          sale_items(
+            quantity,
+            purchases(
+              landing_date,
+              trip_start_date,
+              trip_end_date,
+              quantity,
+              vessels(registration_number),
+              suppliers(name),
+              fishing_zones(name)
+            )
+          )
+        )
       `)
       .eq("id", selectedPurchase)
       .single();
 
-    // Get all sales that used this purchase
-    const { data: saleItems } = await supabase
-      .from("sale_items")
+    // Get grading data
+    const { data: gradings } = await supabase
+      .from("grading")
       .select(`
         *,
-        sales(
-          sale_date,
-          suppliers(name),
-          customers(name)
-        )
+        products(species, unit_of_measurement)
       `)
       .eq("purchase_id", selectedPurchase);
 
-    // Get downstream purchases (created from sales)
-    const saleIds = saleItems?.map(si => si.sale_id) || [];
-    const { data: downstreamPurchases } = await supabase
-      .from("purchases")
+    // Get downstream sales from grading
+    const { data: downstreamSales } = await supabase
+      .from("sale_items")
       .select(`
         *,
-        customers!purchases_downstream_customer_id_fkey(name)
+        grading(grade),
+        sales(
+          sale_date,
+          customers(name)
+        )
       `)
-      .in("source_sale_id", saleIds);
+      .in("grade_id", gradings?.map(g => g.id) || []);
 
     setTraceData({
       purchase,
-      saleItems,
-      downstreamPurchases,
+      gradings,
+      downstreamSales,
     });
   };
 
@@ -79,32 +107,30 @@ export default function Traceability() {
     if (!traceData) return;
     
     const rows = [
-      ["Chain of Custody Report - SeaChain Tracker"],
+      ["Traceability Report"],
       ["Generated", new Date().toISOString()],
       [],
-      ["SOURCE PURCHASE"],
+      ["UPSTREAM CHAIN"],
       ["Vessel", traceData.purchase?.vessels?.registration_number],
       ["Supplier", traceData.purchase?.suppliers?.name],
       ["Fishing Zone", traceData.purchase?.fishing_zones?.name],
       ["Landing Date", traceData.purchase?.landing_date],
       ["Product", traceData.purchase?.products?.species],
       ["Quantity", traceData.purchase?.quantity],
-      ["Trip Start", traceData.purchase?.trip_start_date],
-      ["Trip End", traceData.purchase?.trip_end_date],
       [],
-      ["SALES FROM THIS PURCHASE"],
-      ["Customer", "Seller", "Quantity", "Sale Date"],
-      ...(traceData.saleItems || []).map((s: any) => [
-        s.sales?.customers?.name,
-        s.sales?.suppliers?.name,
-        s.quantity,
-        s.sales?.sale_date
+      ["GRADING BREAKDOWN"],
+      ["Grade", "Quantity", "Available"],
+      ...(traceData.gradings || []).map((g: any) => [
+        gradeLabels[g.grade], g.quantity, g.available_quantity
       ]),
       [],
-      ["DOWNSTREAM RECIPIENTS"],
-      ...(traceData.downstreamPurchases || []).map((p: any) => [
-        "Customer: " + p.customers?.name,
-        "Quantity: " + p.quantity
+      ["DOWNSTREAM SALES"],
+      ["Customer", "Grade", "Quantity", "Sale Date"],
+      ...(traceData.downstreamSales || []).map((s: any) => [
+        s.sales?.customers?.name,
+        gradeLabels[s.grading?.grade],
+        s.quantity,
+        s.sales?.sale_date
       ]),
     ];
 
@@ -121,11 +147,11 @@ export default function Traceability() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Search className="h-8 w-8 text-primary" />
-          Chain of Custody
+          <Search className="h-8 w-8 text-emerald-600" />
+          Full Chain Traceability
         </h1>
         <p className="text-muted-foreground mt-1">
-          Track products from vessel catch through the entire supply chain
+          Track products from vessel to final customer with complete grading history
         </p>
       </div>
 
@@ -136,10 +162,10 @@ export default function Traceability() {
         <CardContent className="space-y-4">
           <div className="flex gap-4 items-end">
             <div className="flex-1 space-y-2">
-              <Label>Select Purchase to Trace</Label>
+              <Label>Select Received Purchase</Label>
               <Select value={selectedPurchase} onValueChange={setSelectedPurchase}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a purchase" />
+                  <SelectValue placeholder="Select a purchase to trace" />
                 </SelectTrigger>
                 <SelectContent>
                   {purchases.map((p) => (
@@ -150,7 +176,7 @@ export default function Traceability() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={traceProduct}>
+            <Button onClick={traceProduct} className="bg-emerald-600 hover:bg-emerald-700">
               <Search className="h-4 w-4 mr-2" />
               Trace
             </Button>
@@ -166,32 +192,32 @@ export default function Traceability() {
 
       {traceData && (
         <div className="space-y-4">
-          {/* Source Purchase */}
-          <Card className="shadow-card border-l-4 border-l-primary">
+          {/* Upstream Chain */}
+          <Card className="shadow-card border-l-4 border-l-blue-500">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-blue-700">
                 <Ship className="h-5 w-5" />
-                Source Purchase (Harvester Level)
+                Upstream Chain (Source)
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center gap-4 flex-wrap">
-                <div className="bg-primary/10 p-4 rounded-lg">
+                <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-xs text-muted-foreground">Vessel</p>
                   <p className="font-semibold">{traceData.purchase?.vessels?.registration_number}</p>
                 </div>
                 <ArrowRight className="text-muted-foreground" />
-                <div className="bg-primary/10 p-4 rounded-lg">
+                <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-xs text-muted-foreground">Fishing Zone</p>
                   <p className="font-semibold">{traceData.purchase?.fishing_zones?.name || "N/A"}</p>
                 </div>
                 <ArrowRight className="text-muted-foreground" />
-                <div className="bg-primary/10 p-4 rounded-lg">
+                <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-xs text-muted-foreground">Supplier</p>
                   <p className="font-semibold">{traceData.purchase?.suppliers?.name}</p>
                 </div>
                 <ArrowRight className="text-muted-foreground" />
-                <div className="bg-primary/10 p-4 rounded-lg">
+                <div className="bg-blue-50 p-4 rounded-lg">
                   <p className="text-xs text-muted-foreground">Product</p>
                   <p className="font-semibold">{traceData.purchase?.products?.species}</p>
                   <p className="text-sm text-muted-foreground">
@@ -216,63 +242,61 @@ export default function Traceability() {
             </CardContent>
           </Card>
 
-          {/* Sales */}
-          <Card className="shadow-card border-l-4 border-l-green-500">
+          {/* Grading */}
+          <Card className="shadow-card border-l-4 border-l-emerald-500">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-green-700">
-                <TrendingUp className="h-5 w-5" />
-                Sales from this Purchase
+              <CardTitle className="flex items-center gap-2 text-emerald-700">
+                <Scale className="h-5 w-5" />
+                Grading & Sorting
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {traceData.saleItems && traceData.saleItems.length > 0 ? (
-                <div className="space-y-3">
-                  {traceData.saleItems.map((item: any, i: number) => (
-                    <div key={i} className="flex items-center gap-4 bg-green-50 p-4 rounded-lg">
-                      <div className="flex-1">
-                        <p className="font-semibold">{item.sales?.suppliers?.name}</p>
-                        <p className="text-sm text-muted-foreground">Seller</p>
-                      </div>
-                      <ArrowRight className="text-muted-foreground" />
-                      <div className="flex-1">
-                        <p className="font-semibold">{item.sales?.customers?.name}</p>
-                        <p className="text-sm text-muted-foreground">Customer</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">{item.quantity} units</p>
-                        <p className="text-sm text-muted-foreground">
-                          {item.sales?.sale_date && format(new Date(item.sales.sale_date), "MMM dd, yyyy")}
-                        </p>
-                      </div>
+              {traceData.gradings && traceData.gradings.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {traceData.gradings.map((g: any) => (
+                    <div key={g.id} className="bg-emerald-50 p-4 rounded-lg">
+                      <Badge variant="outline" className="mb-2 bg-emerald-100 text-emerald-700 border-emerald-300">
+                        {gradeLabels[g.grade]}
+                      </Badge>
+                      <p className="text-lg font-semibold">{g.quantity} {g.products?.unit_of_measurement}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Available: {g.available_quantity} {g.products?.unit_of_measurement}
+                      </p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No sales recorded from this purchase yet</p>
+                <p className="text-muted-foreground">Not yet graded</p>
               )}
             </CardContent>
           </Card>
 
-          {/* Downstream */}
+          {/* Downstream Sales */}
           <Card className="shadow-card border-l-4 border-l-amber-500">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-amber-700">
-                <Anchor className="h-5 w-5" />
-                Downstream Recipients (Auto-Synced)
+                <ShoppingCart className="h-5 w-5" />
+                Downstream Sales
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {traceData.downstreamPurchases && traceData.downstreamPurchases.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {traceData.downstreamPurchases.map((p: any, i: number) => (
-                    <div key={i} className="bg-amber-50 p-4 rounded-lg">
-                      <p className="font-semibold">{p.customers?.name}</p>
-                      <p className="text-sm text-muted-foreground">{p.quantity} units received</p>
+              {traceData.downstreamSales && traceData.downstreamSales.length > 0 ? (
+                <div className="space-y-3">
+                  {traceData.downstreamSales.map((s: any, i: number) => (
+                    <div key={i} className="flex items-center gap-4 bg-amber-50 p-4 rounded-lg">
+                      <div>
+                        <p className="font-semibold">{s.sales?.customers?.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {s.sales?.sale_date && format(new Date(s.sales.sale_date), "MMM dd, yyyy")}
+                        </p>
+                      </div>
+                      <Badge variant="outline">{gradeLabels[s.grading?.grade]}</Badge>
+                      <p className="font-medium">{s.quantity} units sold</p>
                     </div>
                   ))}
                 </div>
               ) : (
-                <p className="text-muted-foreground">No downstream recipients yet</p>
+                <p className="text-muted-foreground">No downstream sales yet</p>
               )}
             </CardContent>
           </Card>

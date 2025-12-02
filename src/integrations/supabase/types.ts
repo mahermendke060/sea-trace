@@ -82,6 +82,63 @@ export type Database = {
         }
         Relationships: []
       }
+      grading: {
+        Row: {
+          available_quantity: number
+          created_at: string
+          grade: Database["public"]["Enums"]["lobster_grade"]
+          graded_at: string
+          graded_by: string | null
+          id: string
+          notes: string | null
+          product_id: string
+          purchase_id: string
+          quantity: number
+          updated_at: string
+        }
+        Insert: {
+          available_quantity: number
+          created_at?: string
+          grade: Database["public"]["Enums"]["lobster_grade"]
+          graded_at?: string
+          graded_by?: string | null
+          id?: string
+          notes?: string | null
+          product_id: string
+          purchase_id: string
+          quantity: number
+          updated_at?: string
+        }
+        Update: {
+          available_quantity?: number
+          created_at?: string
+          grade?: Database["public"]["Enums"]["lobster_grade"]
+          graded_at?: string
+          graded_by?: string | null
+          id?: string
+          notes?: string | null
+          product_id?: string
+          purchase_id?: string
+          quantity?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grading_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "grading_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       locations: {
         Row: {
           address: string | null
@@ -136,13 +193,16 @@ export type Database = {
       purchases: {
         Row: {
           created_at: string | null
+          downstream_customer_id: string | null
           fishing_zone_id: string
           gear_type: string | null
           id: string
+          is_downstream_purchase: boolean | null
           landing_date: string
           notes: string | null
           product_id: string
           quantity: number
+          source_sale_id: string | null
           supplier_id: string
           trip_end_date: string
           trip_start_date: string
@@ -151,13 +211,16 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          downstream_customer_id?: string | null
           fishing_zone_id: string
           gear_type?: string | null
           id?: string
+          is_downstream_purchase?: boolean | null
           landing_date: string
           notes?: string | null
           product_id: string
           quantity: number
+          source_sale_id?: string | null
           supplier_id: string
           trip_end_date: string
           trip_start_date: string
@@ -166,13 +229,16 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          downstream_customer_id?: string | null
           fishing_zone_id?: string
           gear_type?: string | null
           id?: string
+          is_downstream_purchase?: boolean | null
           landing_date?: string
           notes?: string | null
           product_id?: string
           quantity?: number
+          source_sale_id?: string | null
           supplier_id?: string
           trip_end_date?: string
           trip_start_date?: string
@@ -180,6 +246,13 @@ export type Database = {
           vessel_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "purchases_downstream_customer_id_fkey"
+            columns: ["downstream_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "purchases_fishing_zone_id_fkey"
             columns: ["fishing_zone_id"]
@@ -192,6 +265,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_source_sale_id_fkey"
+            columns: ["source_sale_id"]
+            isOneToOne: false
+            referencedRelation: "sales"
             referencedColumns: ["id"]
           },
           {
@@ -213,6 +293,7 @@ export type Database = {
       sale_items: {
         Row: {
           created_at: string | null
+          grade_id: string | null
           id: string
           percentage_used: number | null
           product_id: string
@@ -222,6 +303,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          grade_id?: string | null
           id?: string
           percentage_used?: number | null
           product_id: string
@@ -231,6 +313,7 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          grade_id?: string | null
           id?: string
           percentage_used?: number | null
           product_id?: string
@@ -239,6 +322,13 @@ export type Database = {
           sale_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sale_items_grade_id_fkey"
+            columns: ["grade_id"]
+            isOneToOne: false
+            referencedRelation: "grading"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sale_items_product_id_fkey"
             columns: ["product_id"]
@@ -397,7 +487,15 @@ export type Database = {
       [_ in never]: never
     }
     Enums: {
-      [_ in never]: never
+      lobster_grade:
+        | "culls"
+        | "selects"
+        | "chicks"
+        | "quarters"
+        | "halves"
+        | "jumbo"
+        | "soft_shell"
+        | "hard_shell"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -524,6 +622,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      lobster_grade: [
+        "culls",
+        "selects",
+        "chicks",
+        "quarters",
+        "halves",
+        "jumbo",
+        "soft_shell",
+        "hard_shell",
+      ],
+    },
   },
 } as const

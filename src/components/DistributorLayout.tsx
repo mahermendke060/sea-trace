@@ -6,39 +6,39 @@ import {
   Ship, 
   Fish, 
   Users, 
-  MapPin, 
-  Waves,
+  MapPin,
   ShoppingCart,
   TrendingUp,
-  Search
+  Search,
+  Scale
 } from "lucide-react";
 
 const navigation = [
-  { name: "Dashboard", href: "/seachain-tracker", icon: LayoutDashboard },
-  { name: "Purchases", href: "/seachain-tracker/purchases", icon: ShoppingCart },
-  { name: "Sales", href: "/seachain-tracker/sales", icon: TrendingUp },
-  { name: "Traceability", href: "/seachain-tracker/traceability", icon: Search },
-  { name: "Suppliers", href: "/seachain-tracker/suppliers", icon: Users },
-  { name: "Vessels", href: "/seachain-tracker/vessels", icon: Ship },
-  { name: "Products", href: "/seachain-tracker/products", icon: Fish },
-  { name: "Customers", href: "/seachain-tracker/customers", icon: Anchor },
-  { name: "Locations", href: "/seachain-tracker/locations", icon: MapPin },
-  { name: "Fishing Zones", href: "/seachain-tracker/fishing-zones", icon: Waves },
+  { name: "Dashboard", href: "/distributor", icon: LayoutDashboard },
+  { name: "Purchases", href: "/distributor/purchases", icon: ShoppingCart },
+  { name: "Grading", href: "/distributor/grading", icon: Scale },
+  { name: "Sales", href: "/distributor/sales", icon: TrendingUp },
+  { name: "Traceability", href: "/distributor/traceability", icon: Search },
+  { name: "Suppliers", href: "/distributor/suppliers", icon: Users },
+  { name: "Vessels", href: "/distributor/vessels", icon: Ship },
+  { name: "Products", href: "/distributor/products", icon: Fish },
+  { name: "Customers", href: "/distributor/customers", icon: Anchor },
+  { name: "Locations", href: "/distributor/locations", icon: MapPin },
 ];
 
-export const Layout = ({ children }: { children: React.ReactNode }) => {
+export const DistributorLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="gradient-ocean text-white shadow-ocean sticky top-0 z-50">
+      <header className="bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-lg sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center gap-3">
-            <Ship className="h-8 w-8" />
+            <Scale className="h-8 w-8" />
             <div>
-              <h1 className="text-2xl font-bold">SeaChain Tracker</h1>
-              <p className="text-sm text-white/80">Seafood Supply Chain Management</p>
+              <h1 className="text-2xl font-bold">Distributor Portal</h1>
+              <p className="text-sm text-white/80">Grading & Distribution Management</p>
             </div>
           </div>
         </div>
@@ -58,7 +58,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
                       className={cn(
                         "flex items-center gap-3 px-4 py-3 rounded-lg transition-all",
                         isActive
-                          ? "bg-primary text-primary-foreground shadow-md"
+                          ? "bg-emerald-600 text-white shadow-md"
                           : "text-foreground hover:bg-muted"
                       )}
                     >

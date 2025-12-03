@@ -26,7 +26,9 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
     vessel_id: "",
     product_id: "",
     fishing_zone_id: "",
-    quantity: "",
+    harvest_quantity: "",
+    purchase_quantity: "",
+    num_crates: "",
     gear_type: "",
     trip_start_date: "",
     trip_end_date: "",
@@ -57,7 +59,9 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
         vessel_id: purchase.vessel_id || "",
         product_id: purchase.product_id || "",
         fishing_zone_id: purchase.fishing_zone_id || "",
-        quantity: purchase.quantity?.toString() || "",
+        harvest_quantity: purchase.harvest_quantity?.toString() || purchase.quantity?.toString() || "",
+        purchase_quantity: purchase.purchase_quantity?.toString() || purchase.quantity?.toString() || "",
+        num_crates: purchase.num_crates?.toString() || "",
         gear_type: purchase.gear_type || "",
         trip_start_date: purchase.trip_start_date || "",
         trip_end_date: purchase.trip_end_date || "",
@@ -70,7 +74,9 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
         vessel_id: "",
         product_id: "",
         fishing_zone_id: "",
-        quantity: "",
+        harvest_quantity: "",
+        purchase_quantity: "",
+        num_crates: "",
         gear_type: "",
         trip_start_date: "",
         trip_end_date: "",
@@ -83,9 +89,22 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const purchaseQty = parseFloat(formData.purchase_quantity);
     const submitData = {
-      ...formData,
-      quantity: parseFloat(formData.quantity),
+      supplier_id: formData.supplier_id,
+      vessel_id: formData.vessel_id,
+      product_id: formData.product_id,
+      fishing_zone_id: formData.fishing_zone_id,
+      harvest_quantity: parseFloat(formData.harvest_quantity),
+      purchase_quantity: purchaseQty,
+      quantity: purchaseQty, // Keep for backward compatibility
+      remaining_quantity: purchase ? purchase.remaining_quantity : purchaseQty,
+      num_crates: formData.num_crates ? parseFloat(formData.num_crates) : null,
+      gear_type: formData.gear_type || null,
+      trip_start_date: formData.trip_start_date,
+      trip_end_date: formData.trip_end_date,
+      landing_date: formData.landing_date,
+      notes: formData.notes || null,
     };
 
     const { error } = purchase
@@ -177,14 +196,38 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="quantity">Quantity *</Label>
+              <Label htmlFor="harvest_quantity">Harvest Quantity *</Label>
               <Input
-                id="quantity"
+                id="harvest_quantity"
                 type="number"
                 step="0.01"
-                value={formData.quantity}
-                onChange={(e) => setFormData({ ...formData, quantity: e.target.value })}
+                value={formData.harvest_quantity}
+                onChange={(e) => setFormData({ ...formData, harvest_quantity: e.target.value })}
                 required
+                placeholder="Total harvested"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="purchase_quantity">Purchase Quantity *</Label>
+              <Input
+                id="purchase_quantity"
+                type="number"
+                step="0.01"
+                value={formData.purchase_quantity}
+                onChange={(e) => setFormData({ ...formData, purchase_quantity: e.target.value })}
+                required
+                placeholder="Quantity purchased"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="num_crates">Number of Crates Used</Label>
+              <Input
+                id="num_crates"
+                type="number"
+                step="1"
+                value={formData.num_crates}
+                onChange={(e) => setFormData({ ...formData, num_crates: e.target.value })}
+                placeholder="Number of crates"
               />
             </div>
             <div className="space-y-2">

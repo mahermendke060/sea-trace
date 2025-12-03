@@ -25,6 +25,7 @@ import Traceability from "./pages/Traceability";
 import DistributorDashboard from "./pages/distributor/Dashboard";
 import DistributorPurchases from "./pages/distributor/Purchases";
 import DistributorGrading from "./pages/distributor/Grading";
+import DistributorGradeManagement from "./pages/distributor/GradeManagement";
 import DistributorSales from "./pages/distributor/Sales";
 import DistributorTraceability from "./pages/distributor/Traceability";
 import DistributorSuppliers from "./pages/distributor/Suppliers";
@@ -74,6 +75,7 @@ const App = () => (
           <Route path="/distributor" element={<DistributorLayout><DistributorDashboard /></DistributorLayout>} />
           <Route path="/distributor/purchases" element={<DistributorLayout><DistributorPurchases /></DistributorLayout>} />
           <Route path="/distributor/grading" element={<DistributorLayout><DistributorGrading /></DistributorLayout>} />
+          <Route path="/distributor/grade-management" element={<DistributorLayout><DistributorGradeManagement /></DistributorLayout>} />
           <Route path="/distributor/sales" element={<DistributorLayout><DistributorSales /></DistributorLayout>} />
           <Route path="/distributor/traceability" element={<DistributorLayout><DistributorTraceability /></DistributorLayout>} />
           <Route path="/distributor/suppliers" element={<DistributorLayout><DistributorSuppliers /></DistributorLayout>} />

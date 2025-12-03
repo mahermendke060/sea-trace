@@ -31,6 +31,7 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
     purchase_id: "",
     quantity: "",
     percentage_used: "",
+    num_crates: "",
   }]);
 
   useEffect(() => {
@@ -62,9 +63,55 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
         sale_date: new Date().toISOString().split("T")[0],
         notes: "",
       });
-      setSaleItems([{ purchase_id: "", quantity: "", percentage_used: "" }]);
+      setSaleItems([{ purchase_id: "", quantity: "", percentage_used: "", num_crates: "" }]);
     }
   }, [sale, open]);
+
+  // Handle purchase selection - auto-populate num_crates
+  const handlePurchaseChange = (index: number, purchaseId: string) => {
+    const purchase = purchases.find((p) => p.id === purchaseId);
+    const newItems = [...saleItems];
+    newItems[index] = {
+      ...newItems[index],
+      purchase_id: purchaseId,
+      num_crates: purchase?.num_crates?.toString() || "",
+    };
+    setSaleItems(newItems);
+  };
+
+  // Handle quantity change - recalculate percentage
+  const handleQuantityChange = (index: number, quantity: string) => {
+    const newItems = [...saleItems];
+    const item = newItems[index];
+    const purchase = purchases.find((p) => p.id === item.purchase_id);
+    const purchaseQty = purchase?.purchase_quantity || purchase?.quantity || 0;
+    
+    newItems[index] = {
+      ...item,
+      quantity,
+      percentage_used: purchaseQty > 0 && quantity 
+        ? ((parseFloat(quantity) / purchaseQty) * 100).toFixed(2)
+        : "",
+    };
+    setSaleItems(newItems);
+  };
+
+  // Handle percentage change - recalculate quantity
+  const handlePercentageChange = (index: number, percentage: string) => {
+    const newItems = [...saleItems];
+    const item = newItems[index];
+    const purchase = purchases.find((p) => p.id === item.purchase_id);
+    const purchaseQty = purchase?.purchase_quantity || purchase?.quantity || 0;
+    
+    newItems[index] = {
+      ...item,
+      percentage_used: percentage,
+      quantity: purchaseQty > 0 && percentage
+        ? ((parseFloat(percentage) / 100) * purchaseQty).toFixed(2)
+        : "",
+    };
+    setSaleItems(newItems);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,27 +129,39 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
       return;
     }
 
-    // Insert sale items
-    const itemsToInsert = saleItems.map((item) => {
+    // Insert sale items and update purchase remaining quantities
+    for (const item of saleItems) {
+      if (!item.purchase_id || !item.quantity) continue;
+      
       const purchase = purchases.find((p) => p.id === item.purchase_id);
-      return {
+      const soldQty = parseFloat(item.quantity);
+      
+      // Insert sale item
+      const { error: itemsError } = await supabase.from("sale_items").insert({
         sale_id: saleData.id,
         purchase_id: item.purchase_id,
         product_id: purchase?.product_id,
-        quantity: parseFloat(item.quantity),
+        quantity: soldQty,
         percentage_used: item.percentage_used ? parseFloat(item.percentage_used) : null,
-      };
-    });
-
-    const { error: itemsError } = await supabase.from("sale_items").insert(itemsToInsert);
-
-    if (itemsError) {
-      toast({
-        title: "Error",
-        description: itemsError.message,
-        variant: "destructive",
       });
-      return;
+
+      if (itemsError) {
+        toast({
+          title: "Error",
+          description: itemsError.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Update remaining quantity on purchase
+      const currentRemaining = purchase?.remaining_quantity || purchase?.purchase_quantity || purchase?.quantity || 0;
+      const newRemaining = Math.max(0, currentRemaining - soldQty);
+      
+      await supabase
+        .from("purchases")
+        .update({ remaining_quantity: newRemaining })
+        .eq("id", item.purchase_id);
     }
 
     toast({
@@ -114,7 +173,7 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
   };
 
   const addItem = () => {
-    setSaleItems([...saleItems, { purchase_id: "", quantity: "", percentage_used: "" }]);
+    setSaleItems([...saleItems, { purchase_id: "", quantity: "", percentage_used: "", num_crates: "" }]);
   };
 
   const removeItem = (index: number) => {
@@ -123,7 +182,7 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{sale ? "Edit" : "Record"} Sale</DialogTitle>
         </DialogHeader>
@@ -188,71 +247,88 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
                 Add Item
               </Button>
             </div>
-            {saleItems.map((item, index) => (
-              <div key={index} className="grid grid-cols-12 gap-2 items-end border p-3 rounded">
-                <div className="col-span-5 space-y-2">
-                  <Label className="text-xs">Purchase Source *</Label>
-                  <Select 
-                    value={item.purchase_id} 
-                    onValueChange={(value) => {
-                      const newItems = [...saleItems];
-                      newItems[index].purchase_id = value;
-                      setSaleItems(newItems);
-                    }}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select purchase" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {purchases.map((purchase) => (
-                        <SelectItem key={purchase.id} value={purchase.id}>
-                          {purchase.vessels?.registration_number} - {purchase.products?.species} ({purchase.quantity} {purchase.products?.unit_of_measurement})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-3 space-y-2">
-                  <Label className="text-xs">Quantity *</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={item.quantity}
-                    onChange={(e) => {
-                      const newItems = [...saleItems];
-                      newItems[index].quantity = e.target.value;
-                      setSaleItems(newItems);
-                    }}
-                    required
-                  />
-                </div>
-                <div className="col-span-3 space-y-2">
-                  <Label className="text-xs">% Used</Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={item.percentage_used}
-                    onChange={(e) => {
-                      const newItems = [...saleItems];
-                      newItems[index].percentage_used = e.target.value;
-                      setSaleItems(newItems);
-                    }}
-                  />
-                </div>
-                <div className="col-span-1">
-                  {saleItems.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeItem(index)}
+            {saleItems.map((item, index) => {
+              const selectedPurchase = purchases.find((p) => p.id === item.purchase_id);
+              const availableQty = selectedPurchase?.remaining_quantity || selectedPurchase?.purchase_quantity || selectedPurchase?.quantity || 0;
+              
+              return (
+                <div key={index} className="grid grid-cols-12 gap-2 items-end border p-3 rounded">
+                  <div className="col-span-4 space-y-2">
+                    <Label className="text-xs">Purchase Source *</Label>
+                    <Select 
+                      value={item.purchase_id} 
+                      onValueChange={(value) => handlePurchaseChange(index, value)}
                     >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
-                  )}
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select purchase" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {purchases.map((purchase) => (
+                          <SelectItem key={purchase.id} value={purchase.id}>
+                            {purchase.vessels?.registration_number} - {purchase.products?.species} 
+                            ({purchase.remaining_quantity || purchase.purchase_quantity || purchase.quantity} {purchase.products?.unit_of_measurement} avail.)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label className="text-xs">Sale Qty *</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      max={availableQty}
+                      value={item.quantity}
+                      onChange={(e) => handleQuantityChange(index, e.target.value)}
+                      required
+                      placeholder="Qty"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label className="text-xs">% Used</Label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      max="100"
+                      value={item.percentage_used}
+                      onChange={(e) => handlePercentageChange(index, e.target.value)}
+                      placeholder="%"
+                    />
+                  </div>
+                  <div className="col-span-2 space-y-2">
+                    <Label className="text-xs"># Crates</Label>
+                    <Input
+                      type="number"
+                      step="1"
+                      value={item.num_crates}
+                      onChange={(e) => {
+                        const newItems = [...saleItems];
+                        newItems[index].num_crates = e.target.value;
+                        setSaleItems(newItems);
+                      }}
+                      placeholder="Crates"
+                    />
+                  </div>
+                  <div className="col-span-1 text-xs text-muted-foreground">
+                    {selectedPurchase && (
+                      <span>Avail: {availableQty}</span>
+                    )}
+                  </div>
+                  <div className="col-span-1">
+                    {saleItems.length > 1 && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeItem(index)}
+                      >
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="flex justify-end gap-2 pt-4">

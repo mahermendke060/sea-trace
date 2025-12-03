@@ -32,6 +32,12 @@ export default function Customers() {
     { header: "Location", accessor: (row: any) => row.locations?.name || "-" },
   ];
 
+  const handleDelete = async (customer: any) => {
+    if (!confirm(`Delete customer "${customer.name}"?`)) return;
+    await supabase.from("customers").delete().eq("id", customer.id);
+    fetchCustomers();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -54,6 +60,7 @@ export default function Customers() {
             columns={columns} 
             data={customers} 
             onEdit={(customer) => { setSelectedCustomer(customer); setDialogOpen(true); }}
+            onDelete={handleDelete}
           />
         </CardContent>
       </Card>

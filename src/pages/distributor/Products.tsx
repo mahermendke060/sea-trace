@@ -23,6 +23,12 @@ export default function DistributorProducts() {
     { header: "Unit of Measurement", accessor: "unit_of_measurement" },
   ];
 
+  const handleDelete = async (product: any) => {
+    if (!confirm(`Delete product "${product.species}"?`)) return;
+    await supabase.from("products").delete().eq("id", product.id);
+    fetchProducts();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -37,7 +43,7 @@ export default function DistributorProducts() {
       <Card className="shadow-card">
         <CardHeader><CardTitle>All Products</CardTitle></CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={products} onEdit={(p) => { setSelectedProduct(p); setDialogOpen(true); }} />
+          <DataTable columns={columns} data={products} onEdit={(p) => { setSelectedProduct(p); setDialogOpen(true); }} onDelete={handleDelete} />
         </CardContent>
       </Card>
       <ProductDialog open={dialogOpen} onOpenChange={setDialogOpen} product={selectedProduct} onSuccess={fetchProducts} />

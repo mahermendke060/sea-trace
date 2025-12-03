@@ -30,6 +30,12 @@ export default function Vessels() {
     { header: "Supplier", accessor: (row: any) => row.suppliers?.name || "-" },
   ];
 
+  const handleDelete = async (vessel: any) => {
+    if (!confirm(`Delete vessel "${vessel.registration_number || vessel.license_number || ''}"?`)) return;
+    await supabase.from("vessels").delete().eq("id", vessel.id);
+    fetchVessels();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -52,6 +58,7 @@ export default function Vessels() {
             columns={columns} 
             data={vessels} 
             onEdit={(vessel) => { setSelectedVessel(vessel); setDialogOpen(true); }}
+            onDelete={handleDelete}
           />
         </CardContent>
       </Card>

@@ -42,6 +42,12 @@ export default function Suppliers() {
     setDialogOpen(true);
   };
 
+  const handleDelete = async (supplier: any) => {
+    if (!confirm(`Delete supplier "${supplier.name}"?`)) return;
+    await supabase.from("suppliers").delete().eq("id", supplier.id);
+    fetchSuppliers();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -64,6 +70,7 @@ export default function Suppliers() {
             columns={columns} 
             data={suppliers} 
             onEdit={handleEdit}
+            onDelete={handleDelete}
           />
         </CardContent>
       </Card>

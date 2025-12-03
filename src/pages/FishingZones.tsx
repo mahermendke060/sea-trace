@@ -28,6 +28,12 @@ export default function FishingZones() {
     { header: "Description", accessor: "description" },
   ];
 
+  const handleDelete = async (zone: any) => {
+    if (!confirm(`Delete fishing zone "${zone.name}"?`)) return;
+    await supabase.from("fishing_zones").delete().eq("id", zone.id);
+    fetchZones();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -50,6 +56,7 @@ export default function FishingZones() {
             columns={columns} 
             data={zones} 
             onEdit={(zone) => { setSelectedZone(zone); setDialogOpen(true); }}
+            onDelete={handleDelete}
           />
         </CardContent>
       </Card>

@@ -28,6 +28,12 @@ export default function Products() {
     { header: "Unit", accessor: "unit_of_measurement" },
   ];
 
+  const handleDelete = async (product: any) => {
+    if (!confirm(`Delete product "${product.species}"?`)) return;
+    await supabase.from("products").delete().eq("id", product.id);
+    fetchProducts();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -50,6 +56,7 @@ export default function Products() {
             columns={columns} 
             data={products} 
             onEdit={(product) => { setSelectedProduct(product); setDialogOpen(true); }}
+            onDelete={handleDelete}
           />
         </CardContent>
       </Card>

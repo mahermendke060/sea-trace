@@ -42,6 +42,12 @@ export default function Purchases() {
     { header: "Zone", accessor: (row: any) => row.fishing_zones?.name || "-" },
   ];
 
+  const handleDelete = async (purchase: any) => {
+    if (!confirm("Delete this purchase?")) return;
+    await supabase.from("purchases").delete().eq("id", purchase.id);
+    fetchPurchases();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -64,6 +70,7 @@ export default function Purchases() {
             columns={columns} 
             data={purchases} 
             onEdit={(purchase) => { setSelectedPurchase(purchase); setDialogOpen(true); }}
+            onDelete={handleDelete}
           />
         </CardContent>
       </Card>

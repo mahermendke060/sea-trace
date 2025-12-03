@@ -53,6 +53,12 @@ export default function Locations() {
     { header: "Address", accessor: "address" },
   ];
 
+  const handleDelete = async (location: any) => {
+    if (!confirm(`Delete location "${location.name}"?`)) return;
+    await supabase.from("locations").delete().eq("id", location.id);
+    fetchLocations();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -75,6 +81,7 @@ export default function Locations() {
             columns={columns} 
             data={locations} 
             onEdit={(location) => { setSelectedLocation(location); setDialogOpen(true); }}
+            onDelete={handleDelete}
           />
         </CardContent>
       </Card>

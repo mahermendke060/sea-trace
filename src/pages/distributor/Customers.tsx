@@ -27,6 +27,12 @@ export default function DistributorCustomers() {
     { header: "Location", accessor: (row: any) => row.locations?.name || "-" },
   ];
 
+  const handleDelete = async (customer: any) => {
+    if (!confirm(`Delete customer "${customer.name}"?`)) return;
+    await supabase.from("customers").delete().eq("id", customer.id);
+    fetchCustomers();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -41,7 +47,7 @@ export default function DistributorCustomers() {
       <Card className="shadow-card">
         <CardHeader><CardTitle>All Customers</CardTitle></CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={customers} onEdit={(c) => { setSelectedCustomer(c); setDialogOpen(true); }} />
+          <DataTable columns={columns} data={customers} onEdit={(c) => { setSelectedCustomer(c); setDialogOpen(true); }} onDelete={handleDelete} />
         </CardContent>
       </Card>
       <CustomerDialog open={dialogOpen} onOpenChange={setDialogOpen} customer={selectedCustomer} onSuccess={fetchCustomers} />

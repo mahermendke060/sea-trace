@@ -47,6 +47,12 @@ export default function Sales() {
     },
   ];
 
+  const handleDelete = async (sale: any) => {
+    if (!confirm("Delete this sale?")) return;
+    await supabase.from("sales").delete().eq("id", sale.id);
+    fetchSales();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -69,6 +75,7 @@ export default function Sales() {
             columns={columns} 
             data={sales} 
             onEdit={(sale) => { setSelectedSale(sale); setDialogOpen(true); }}
+            onDelete={handleDelete}
           />
         </CardContent>
       </Card>

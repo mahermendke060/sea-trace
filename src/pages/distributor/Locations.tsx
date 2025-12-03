@@ -47,6 +47,12 @@ export default function DistributorLocations() {
     { header: "Address", accessor: "address" },
   ];
 
+  const handleDelete = async (location: any) => {
+    if (!confirm(`Delete location "${location.name}"?`)) return;
+    await supabase.from("locations").delete().eq("id", location.id);
+    fetchLocations();
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -61,7 +67,7 @@ export default function DistributorLocations() {
       <Card className="shadow-card">
         <CardHeader><CardTitle>All Locations</CardTitle></CardHeader>
         <CardContent>
-          <DataTable columns={columns} data={locations} onEdit={(l) => { setSelectedLocation(l); setDialogOpen(true); }} />
+          <DataTable columns={columns} data={locations} onEdit={(l) => { setSelectedLocation(l); setDialogOpen(true); }} onDelete={handleDelete} />
         </CardContent>
       </Card>
       <LocationDialog open={dialogOpen} onOpenChange={setDialogOpen} location={selectedLocation} onSuccess={fetchLocations} />

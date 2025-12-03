@@ -50,7 +50,7 @@ export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess, dis
         supabase.from("grading").select(`
           *,
           products(species, unit_of_measurement),
-          purchases(vessels(registration_number), suppliers(name))
+          purchases(vessels(registration_number), suppliers(id, name))
         `).gt("available_quantity", 0),
       ]);
       setCustomers(customersData.data || []);
@@ -94,7 +94,16 @@ export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess, dis
 
     // Use first grading's purchase supplier as seller_id for record-keeping
     const firstGrading = gradings.find(g => g.id === saleItems[0]?.grading_id);
-    const sellerId = distributorId || firstGrading?.purchases?.suppliers?.id;
+    const sellerId = distributorId || firstGrading?.purchases?.suppliers?.id || (firstGrading as any)?.purchases?.supplier_id;
+
+    if (!sellerId) {
+      toast({
+        title: "Validation Error",
+        description: "Unable to determine seller. Please ensure the graded item links to a purchase with a supplier.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     const salePayload = {
       ...formData,

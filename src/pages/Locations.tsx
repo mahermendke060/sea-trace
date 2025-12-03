@@ -25,7 +25,31 @@ export default function Locations() {
 
   const columns = [
     { header: "Name", accessor: "name" },
-    { header: "Type", accessor: "type" },
+    {
+      header: "Scope",
+      accessor: (row: any) => {
+        // Prefer UI mapping from localStorage when present
+        try {
+          const raw = localStorage.getItem("location_scope");
+          if (raw) {
+            const map = JSON.parse(raw);
+            if (map && map[row.id]) return map[row.id];
+          }
+        } catch {}
+        const t = row.type || "";
+        if (typeof t === "string" && t.startsWith("external_")) return "external";
+        if (typeof t === "string" && t.startsWith("internal_")) return "internal";
+        return "internal"; // default when no stored scope or prefix
+      },
+    },
+    {
+      header: "Type",
+      accessor: (row: any) => {
+        const t = row.type || "";
+        const match = /^(internal|external)_(.+)$/.exec(t);
+        return match ? match[2] : t;
+      },
+    },
     { header: "Address", accessor: "address" },
   ];
 

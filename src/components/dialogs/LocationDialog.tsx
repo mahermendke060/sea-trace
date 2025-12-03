@@ -22,15 +22,29 @@ export const LocationDialog = ({ open, onOpenChange, location, onSuccess }: Loca
     type: "wharf",
     address: "",
   });
+  const [scope, setScope] = useState<"internal" | "external">("internal");
 
   useEffect(() => {
     if (location) {
-      setFormData({
-        name: location.name || "",
-        type: location.type || "wharf",
-        address: location.address || "",
-      });
+      const rawType: string = location.type || "wharf";
+      const match = /^(internal|external)_(.+)$/.exec(rawType);
+      if (match) {
+        setScope(match[1] as "internal" | "external");
+        setFormData({
+          name: location.name || "",
+          type: match[2] || "wharf",
+          address: location.address || "",
+        });
+      } else {
+        setScope("internal");
+        setFormData({
+          name: location.name || "",
+          type: rawType,
+          address: location.address || "",
+        });
+      }
     } else {
+      setScope("internal");
       setFormData({
         name: "",
         type: "wharf",
@@ -42,24 +56,40 @@ export const LocationDialog = ({ open, onOpenChange, location, onSuccess }: Loca
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const { error } = location
-      ? await supabase.from("locations").update(formData).eq("id", location.id)
-      : await supabase.from("locations").insert([formData]);
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    // UI-only scope: do not persist it to DB to avoid violating type check constraint
+    if (location) {
+      const { error } = await supabase.from("locations").update(formData).eq("id", location.id);
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
+      // Save scope to localStorage mapping
+      try {
+        const raw = localStorage.getItem("location_scope") || "{}";
+        const map = JSON.parse(raw);
+        map[location.id] = scope;
+        localStorage.setItem("location_scope", JSON.stringify(map));
+      } catch {}
     } else {
-      toast({
-        title: "Success",
-        description: `Location ${location ? "updated" : "created"} successfully`,
-      });
-      onSuccess();
-      onOpenChange(false);
+      const { data, error } = await supabase.from("locations").insert([formData]).select().single();
+      if (error) {
+        toast({ title: "Error", description: error.message, variant: "destructive" });
+        return;
+      }
+      // Save scope to localStorage mapping with new id
+      try {
+        const raw = localStorage.getItem("location_scope") || "{}";
+        const map = JSON.parse(raw);
+        if (data?.id) map[data.id] = scope;
+        localStorage.setItem("location_scope", JSON.stringify(map));
+      } catch {}
     }
+    toast({
+      title: "Success",
+      description: `Location ${location ? "updated" : "created"} successfully`,
+    });
+    onSuccess();
+    onOpenChange(false);
   };
 
   return (
@@ -78,6 +108,18 @@ export const LocationDialog = ({ open, onOpenChange, location, onSuccess }: Loca
               required
               placeholder="e.g., Harbor Bay Wharf"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="scope">Location Scope *</Label>
+            <Select value={scope} onValueChange={(value) => setScope(value as any)}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="internal">Internal Location</SelectItem>
+                <SelectItem value="external">External Location</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-2">
             <Label htmlFor="type">Type *</Label>

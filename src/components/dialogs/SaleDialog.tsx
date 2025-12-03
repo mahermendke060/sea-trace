@@ -38,14 +38,19 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
       const [suppliersData, customersData, purchasesData] = await Promise.all([
         supabase.from("suppliers").select("*"),
         supabase.from("customers").select("*"),
-        supabase.from("purchases").select("*, products(species, unit_of_measurement), vessels(registration_number)"),
+        supabase
+          .from("purchases")
+          .select("*, products(species, unit_of_measurement), vessels(registration_number)")
+          .gt("remaining_quantity", 0),
       ]);
       setSuppliers(suppliersData.data || []);
       setCustomers(customersData.data || []);
       setPurchases(purchasesData.data || []);
     };
-    fetchData();
-  }, []);
+    if (open) {
+      fetchData();
+    }
+  }, [open]);
 
   useEffect(() => {
     if (sale) {
@@ -81,12 +86,17 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
     const newItems = [...saleItems];
     const item = newItems[index];
     const purchase = purchases.find((p) => p.id === item.purchase_id);
-    const purchaseQty = purchase?.purchase_quantity || purchase?.quantity || 0;
-    
+    const baseQty = purchase?.remaining_quantity || purchase?.purchase_quantity || purchase?.quantity || 0;
+    // Subtract any quantities already allocated in other rows for the same purchase
+    const allocatedElsewhere = saleItems
+      .filter((si, i) => i !== index && si.purchase_id === item.purchase_id && si.quantity)
+      .reduce((sum, si) => sum + (parseFloat(si.quantity) || 0), 0);
+    const purchaseQty = Math.max(0, baseQty - allocatedElsewhere);
+
     newItems[index] = {
       ...item,
       quantity,
-      percentage_used: purchaseQty > 0 && quantity 
+      percentage_used: purchaseQty > 0 && quantity
         ? ((parseFloat(quantity) / purchaseQty) * 100).toFixed(2)
         : "",
     };
@@ -98,8 +108,12 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
     const newItems = [...saleItems];
     const item = newItems[index];
     const purchase = purchases.find((p) => p.id === item.purchase_id);
-    const purchaseQty = purchase?.purchase_quantity || purchase?.quantity || 0;
-    
+    const baseQty = purchase?.remaining_quantity || purchase?.purchase_quantity || purchase?.quantity || 0;
+    const allocatedElsewhere = saleItems
+      .filter((si, i) => i !== index && si.purchase_id === item.purchase_id && si.quantity)
+      .reduce((sum, si) => sum + (parseFloat(si.quantity) || 0), 0);
+    const purchaseQty = Math.max(0, baseQty - allocatedElsewhere);
+
     newItems[index] = {
       ...item,
       percentage_used: percentage,
@@ -136,10 +150,10 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
     // Insert sale items and update purchase remaining quantities
     for (const item of saleItems) {
       if (!item.purchase_id || !item.quantity) continue;
-      
+
       const purchase = purchases.find((p) => p.id === item.purchase_id);
       const soldQty = parseFloat(item.quantity);
-      
+
       // Insert sale item
       const { error: itemsError } = await supabase.from("sale_items").insert({
         sale_id: saleData.id,
@@ -161,7 +175,7 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
       // Update remaining quantity on purchase
       const currentRemaining = purchase?.remaining_quantity || purchase?.purchase_quantity || purchase?.quantity || 0;
       const newRemaining = Math.max(0, currentRemaining - soldQty);
-      
+
       await supabase
         .from("purchases")
         .update({ remaining_quantity: newRemaining })
@@ -238,14 +252,18 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
             </div>
             {saleItems.map((item, index) => {
               const selectedPurchase = purchases.find((p) => p.id === item.purchase_id);
-              const availableQty = selectedPurchase?.remaining_quantity || selectedPurchase?.purchase_quantity || selectedPurchase?.quantity || 0;
-              
+              const baseAvail = selectedPurchase?.remaining_quantity || selectedPurchase?.purchase_quantity || selectedPurchase?.quantity || 0;
+              const allocatedElsewhere = saleItems
+                .filter((si, i) => i !== index && si.purchase_id === item.purchase_id && si.quantity)
+                .reduce((sum, si) => sum + (parseFloat(si.quantity) || 0), 0);
+              const availableQty = Math.max(0, baseAvail - allocatedElsewhere);
+
               return (
                 <div key={index} className="grid grid-cols-12 gap-2 items-end border p-3 rounded">
                   <div className="col-span-4 space-y-2">
                     <Label className="text-xs">Purchase Source *</Label>
-                    <Select 
-                      value={item.purchase_id} 
+                    <Select
+                      value={item.purchase_id}
                       onValueChange={(value) => handlePurchaseChange(index, value)}
                     >
                       <SelectTrigger>
@@ -254,15 +272,26 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
                       <SelectContent>
                         {purchases
                           .filter((p) => {
-                            const remaining = p.remaining_quantity ?? p.purchase_quantity ?? p.quantity ?? 0;
-                            return remaining > 0 && !p.is_downstream_purchase;
+                            const base = p.remaining_quantity ?? p.purchase_quantity ?? p.quantity ?? 0;
+                            const allocated = saleItems
+                              .filter((si, i) => si.purchase_id === p.id && i !== index && si.quantity)
+                              .reduce((sum, si) => sum + (parseFloat(si.quantity) || 0), 0);
+                            const dynRemaining = Math.max(0, base - allocated);
+                            return dynRemaining > 0 && !p.is_downstream_purchase;
                           })
-                          .map((purchase) => (
-                            <SelectItem key={purchase.id} value={purchase.id}>
-                              {purchase.vessels?.registration_number} - {purchase.products?.species} 
-                              ({purchase.remaining_quantity || purchase.purchase_quantity || purchase.quantity} {purchase.products?.unit_of_measurement} avail.)
-                            </SelectItem>
-                          ))}
+                          .map((purchase) => {
+                            const base = purchase.remaining_quantity ?? purchase.purchase_quantity ?? purchase.quantity ?? 0;
+                            const allocated = saleItems
+                              .filter((si, i) => si.purchase_id === purchase.id && i !== index && si.quantity)
+                              .reduce((sum, si) => sum + (parseFloat(si.quantity) || 0), 0);
+                            const dynRemaining = Math.max(0, base - allocated);
+                            return (
+                              <SelectItem key={purchase.id} value={purchase.id}>
+                                {purchase.vessels?.registration_number} - {purchase.products?.species}
+                                ({dynRemaining} {purchase.products?.unit_of_measurement} avail.)
+                              </SelectItem>
+                            );
+                          })}
                       </SelectContent>
                     </Select>
                   </div>

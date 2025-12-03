@@ -21,7 +21,6 @@ const navigation = [
   { name: "Grade Setup", href: "/distributor/grade-management", icon: Settings },
   { name: "Sales", href: "/distributor/sales", icon: TrendingUp },
   { name: "Traceability", href: "/distributor/traceability", icon: Search },
-  { name: "Suppliers", href: "/distributor/suppliers", icon: Users },
   { name: "Vessels", href: "/distributor/vessels", icon: Ship },
   { name: "Products", href: "/distributor/products", icon: Fish },
   { name: "Customers", href: "/distributor/customers", icon: Anchor },

@@ -8,8 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Trash2, AlertCircle, TrendingDown } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus, Trash2, TrendingDown } from "lucide-react";
 import { format } from "date-fns";
 
 interface GradingDialogProps {
@@ -21,8 +20,11 @@ interface GradingDialogProps {
 
 export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: GradingDialogProps) => {
   const { toast } = useToast();
+  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
+  const [filteredPurchases, setFilteredPurchases] = useState<any[]>([]);
   const [grades, setGrades] = useState<any[]>([]);
+  const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
   const [gradeItems, setGradeItems] = useState<any[]>([{ grade: "", quantity: "", percentage: "" }]);
   const [gradedBy, setGradedBy] = useState("");
@@ -33,14 +35,15 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
 
   useEffect(() => {
     const fetchData = async () => {
-      const [purchasesData, gradesData] = await Promise.all([
+      const [suppliersData, purchasesData, gradesData] = await Promise.all([
+        supabase.from("suppliers").select("*").order("name"),
         supabase
           .from("purchases")
           .select(`
             *,
             products(id, species, unit_of_measurement),
             vessels(registration_number),
-            suppliers(name)
+            suppliers(id, name)
           `)
           .eq("is_downstream_purchase", true)
           .order("landing_date", { ascending: false }),
@@ -50,15 +53,29 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
           .eq("is_active", true)
           .order("sort_order", { ascending: true }),
       ]);
+      setSuppliers(suppliersData.data || []);
       setPurchases(purchasesData.data || []);
       setGrades(gradesData.data || []);
     };
     fetchData();
   }, []);
 
+  // Filter purchases when supplier changes
+  useEffect(() => {
+    if (selectedSupplierId) {
+      const filtered = purchases.filter(p => p.supplier_id === selectedSupplierId);
+      setFilteredPurchases(filtered);
+    } else {
+      setFilteredPurchases([]);
+    }
+    setSelectedPurchase(null);
+  }, [selectedSupplierId, purchases]);
+
   useEffect(() => {
     if (!open) {
+      setSelectedSupplierId("");
       setSelectedPurchase(null);
+      setFilteredPurchases([]);
       setGradeItems([{ grade: "", quantity: "", percentage: "" }]);
       setGradedBy("");
       setNotes("");
@@ -67,6 +84,18 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
       setWeightPerCrate("");
     }
   }, [open]);
+
+  // Handle purchase selection - auto-fill weight per crate
+  const handlePurchaseSelect = (purchaseId: string) => {
+    const purchase = purchases.find(p => p.id === purchaseId);
+    setSelectedPurchase(purchase);
+    if (purchase?.num_crates) setNumCrates(purchase.num_crates.toString());
+    // Auto-fill weight per crate if available from purchase data
+    if (purchase?.num_crates && purchase?.purchase_quantity) {
+      const wpc = purchase.purchase_quantity / purchase.num_crates;
+      setWeightPerCrate(wpc.toFixed(2));
+    }
+  };
 
   // Calculate total weight from crates
   const calculatedTotalWeight = numCrates && weightPerCrate 
@@ -175,31 +204,53 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
           <DialogTitle>Grade Products</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Purchase Selection */}
+          {/* Step 1: Purchased From (Supplier) */}
           <div className="space-y-2">
-            <Label>Select Purchase to Grade *</Label>
+            <Label>Purchased From *</Label>
             <Select 
-              value={selectedPurchase?.id || ""} 
-              onValueChange={(value) => {
-                const purchase = purchases.find(p => p.id === value);
-                setSelectedPurchase(purchase);
-                if (purchase?.num_crates) setNumCrates(purchase.num_crates.toString());
-              }}
+              value={selectedSupplierId} 
+              onValueChange={setSelectedSupplierId}
             >
               <SelectTrigger>
-                <SelectValue placeholder="Select a purchase" />
+                <SelectValue placeholder="Select supplier" />
               </SelectTrigger>
               <SelectContent>
-                {purchases.map((purchase) => (
-                  <SelectItem key={purchase.id} value={purchase.id}>
-                    {purchase.vessels?.registration_number} - {purchase.products?.species} 
-                    ({purchase.purchase_quantity || purchase.quantity} {purchase.products?.unit_of_measurement}) 
-                    - {purchase.suppliers?.name}
+                {suppliers.map((supplier) => (
+                  <SelectItem key={supplier.id} value={supplier.id}>
+                    {supplier.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {/* Step 2: Purchase ID (filtered by supplier) */}
+          {selectedSupplierId && (
+            <div className="space-y-2">
+              <Label>Purchase ID *</Label>
+              <Select 
+                value={selectedPurchase?.id || ""} 
+                onValueChange={handlePurchaseSelect}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a purchase" />
+                </SelectTrigger>
+                <SelectContent>
+                  {filteredPurchases.length === 0 ? (
+                    <SelectItem value="none" disabled>No purchases from this supplier</SelectItem>
+                  ) : (
+                    filteredPurchases.map((purchase) => (
+                      <SelectItem key={purchase.id} value={purchase.id}>
+                        {purchase.vessels?.registration_number} - {purchase.products?.species} 
+                        ({purchase.purchase_quantity || purchase.quantity} {purchase.products?.unit_of_measurement}) 
+                        - {format(new Date(purchase.landing_date), "MMM dd, yyyy")}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {selectedPurchase && (
             <>

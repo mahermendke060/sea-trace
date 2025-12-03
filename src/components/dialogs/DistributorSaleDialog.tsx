@@ -15,6 +15,7 @@ interface DistributorSaleDialogProps {
   onOpenChange: (open: boolean) => void;
   sale?: any;
   onSuccess: () => void;
+  distributorId?: string;
 }
 
 const gradeLabels: Record<string, string> = {
@@ -28,13 +29,11 @@ const gradeLabels: Record<string, string> = {
   hard_shell: "Hard Shell",
 };
 
-export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess }: DistributorSaleDialogProps) => {
+export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess, distributorId }: DistributorSaleDialogProps) => {
   const { toast } = useToast();
-  const [suppliers, setSuppliers] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
   const [gradings, setGradings] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    seller_id: "",
     customer_id: "",
     sale_date: "",
     notes: "",
@@ -46,16 +45,14 @@ export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess }: D
 
   useEffect(() => {
     const fetchData = async () => {
-      const [suppliersData, customersData, gradingsData] = await Promise.all([
-        supabase.from("suppliers").select("*"),
+      const [customersData, gradingsData] = await Promise.all([
         supabase.from("customers").select("*"),
         supabase.from("grading").select(`
           *,
           products(species, unit_of_measurement),
-          purchases(vessels(registration_number))
+          purchases(vessels(registration_number), suppliers(name))
         `).gt("available_quantity", 0),
       ]);
-      setSuppliers(suppliersData.data || []);
       setCustomers(customersData.data || []);
       setGradings(gradingsData.data || []);
     };
@@ -65,14 +62,12 @@ export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess }: D
   useEffect(() => {
     if (sale) {
       setFormData({
-        seller_id: sale.seller_id || "",
         customer_id: sale.customer_id || "",
         sale_date: sale.sale_date || "",
         notes: sale.notes || "",
       });
     } else {
       setFormData({
-        seller_id: "",
         customer_id: "",
         sale_date: new Date().toISOString().split("T")[0],
         notes: "",
@@ -97,9 +92,18 @@ export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess }: D
       }
     }
 
+    // Use first grading's purchase supplier as seller_id for record-keeping
+    const firstGrading = gradings.find(g => g.id === saleItems[0]?.grading_id);
+    const sellerId = distributorId || firstGrading?.purchases?.suppliers?.id;
+
+    const salePayload = {
+      ...formData,
+      seller_id: sellerId,
+    };
+
     const { data: saleData, error: saleError } = sale
-      ? await supabase.from("sales").update(formData).eq("id", sale.id).select().single()
-      : await supabase.from("sales").insert([formData]).select().single();
+      ? await supabase.from("sales").update(salePayload).eq("id", sale.id).select().single()
+      : await supabase.from("sales").insert([salePayload]).select().single();
 
     if (saleError) {
       toast({
@@ -169,21 +173,6 @@ export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess }: D
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="seller_id">Seller *</Label>
-              <Select value={formData.seller_id} onValueChange={(value) => setFormData({ ...formData, seller_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select seller" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="customer_id">Customer *</Label>
               <Select value={formData.customer_id} onValueChange={(value) => setFormData({ ...formData, customer_id: value })}>
                 <SelectTrigger>
@@ -198,7 +187,7 @@ export const DistributorSaleDialog = ({ open, onOpenChange, sale, onSuccess }: D
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 col-span-2">
+            <div className="space-y-2">
               <Label htmlFor="sale_date">Sale Date *</Label>
               <Input
                 id="sale_date"

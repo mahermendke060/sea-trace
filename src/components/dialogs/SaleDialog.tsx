@@ -22,7 +22,6 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
   const [customers, setCustomers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [formData, setFormData] = useState({
-    seller_id: "",
     customer_id: "",
     sale_date: "",
     notes: "",
@@ -51,14 +50,12 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
   useEffect(() => {
     if (sale) {
       setFormData({
-        seller_id: sale.seller_id || "",
         customer_id: sale.customer_id || "",
         sale_date: sale.sale_date || "",
         notes: sale.notes || "",
       });
     } else {
       setFormData({
-        seller_id: "",
         customer_id: "",
         sale_date: new Date().toISOString().split("T")[0],
         notes: "",
@@ -116,9 +113,16 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Get seller_id from the first purchase's supplier
+    const firstPurchase = purchases.find((p) => p.id === saleItems[0]?.purchase_id);
+    const salePayload = {
+      ...formData,
+      seller_id: firstPurchase?.supplier_id,
+    };
+
     const { data: saleData, error: saleError } = sale
-      ? await supabase.from("sales").update(formData).eq("id", sale.id).select().single()
-      : await supabase.from("sales").insert([formData]).select().single();
+      ? await supabase.from("sales").update(salePayload).eq("id", sale.id).select().single()
+      : await supabase.from("sales").insert([salePayload]).select().single();
 
     if (saleError) {
       toast({
@@ -189,21 +193,6 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="seller_id">Seller *</Label>
-              <Select value={formData.seller_id} onValueChange={(value) => setFormData({ ...formData, seller_id: value })}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select seller" />
-                </SelectTrigger>
-                <SelectContent>
-                  {suppliers.map((supplier) => (
-                    <SelectItem key={supplier.id} value={supplier.id}>
-                      {supplier.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="customer_id">Customer *</Label>
               <Select value={formData.customer_id} onValueChange={(value) => setFormData({ ...formData, customer_id: value })}>
                 <SelectTrigger>
@@ -218,7 +207,7 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 col-span-2">
+            <div className="space-y-2">
               <Label htmlFor="sale_date">Sale Date *</Label>
               <Input
                 id="sale_date"

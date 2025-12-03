@@ -41,7 +41,7 @@ export default function Sales() {
       accessor: (row: any) => {
         const items = row.sale_items || [];
         return items.length > 0 
-          ? items.map((item: any) => `${item.quantity} ${item.products?.unit_of_measurement} ${item.products?.species}`).join(", ")
+          ? items.map((item: any) => `${item.quantity} ${item.products?.unit_of_measurement} ${item.products?.species} (${item.percentage_used?.toFixed(1) || "-"}%)`).join(", ")
           : "-";
       }
     },

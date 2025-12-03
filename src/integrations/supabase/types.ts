@@ -82,6 +82,39 @@ export type Database = {
         }
         Relationships: []
       }
+      grades: {
+        Row: {
+          code: string
+          created_at: string
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       grading: {
         Row: {
           available_quantity: number
@@ -91,10 +124,17 @@ export type Database = {
           graded_by: string | null
           id: string
           notes: string | null
+          num_crates: number | null
+          percentage_of_purchase: number | null
           product_id: string
           purchase_id: string
+          purchased_on: string | null
           quantity: number
+          shrinkage_percentage: number | null
+          shrinkage_weight: number | null
+          total_weight: number | null
           updated_at: string
+          weight_per_crate: number | null
         }
         Insert: {
           available_quantity: number
@@ -104,10 +144,17 @@ export type Database = {
           graded_by?: string | null
           id?: string
           notes?: string | null
+          num_crates?: number | null
+          percentage_of_purchase?: number | null
           product_id: string
           purchase_id: string
+          purchased_on?: string | null
           quantity: number
+          shrinkage_percentage?: number | null
+          shrinkage_weight?: number | null
+          total_weight?: number | null
           updated_at?: string
+          weight_per_crate?: number | null
         }
         Update: {
           available_quantity?: number
@@ -117,10 +164,17 @@ export type Database = {
           graded_by?: string | null
           id?: string
           notes?: string | null
+          num_crates?: number | null
+          percentage_of_purchase?: number | null
           product_id?: string
           purchase_id?: string
+          purchased_on?: string | null
           quantity?: number
+          shrinkage_percentage?: number | null
+          shrinkage_weight?: number | null
+          total_weight?: number | null
           updated_at?: string
+          weight_per_crate?: number | null
         }
         Relationships: [
           {
@@ -196,12 +250,16 @@ export type Database = {
           downstream_customer_id: string | null
           fishing_zone_id: string
           gear_type: string | null
+          harvest_quantity: number | null
           id: string
           is_downstream_purchase: boolean | null
           landing_date: string
           notes: string | null
+          num_crates: number | null
           product_id: string
+          purchase_quantity: number | null
           quantity: number
+          remaining_quantity: number | null
           source_sale_id: string | null
           supplier_id: string
           trip_end_date: string
@@ -214,12 +272,16 @@ export type Database = {
           downstream_customer_id?: string | null
           fishing_zone_id: string
           gear_type?: string | null
+          harvest_quantity?: number | null
           id?: string
           is_downstream_purchase?: boolean | null
           landing_date: string
           notes?: string | null
+          num_crates?: number | null
           product_id: string
+          purchase_quantity?: number | null
           quantity: number
+          remaining_quantity?: number | null
           source_sale_id?: string | null
           supplier_id: string
           trip_end_date: string
@@ -232,12 +294,16 @@ export type Database = {
           downstream_customer_id?: string | null
           fishing_zone_id?: string
           gear_type?: string | null
+          harvest_quantity?: number | null
           id?: string
           is_downstream_purchase?: boolean | null
           landing_date?: string
           notes?: string | null
+          num_crates?: number | null
           product_id?: string
+          purchase_quantity?: number | null
           quantity?: number
+          remaining_quantity?: number | null
           source_sale_id?: string | null
           supplier_id?: string
           trip_end_date?: string

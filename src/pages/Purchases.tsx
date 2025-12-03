@@ -35,7 +35,10 @@ export default function Purchases() {
     { header: "Vessel", accessor: (row: any) => row.vessels?.registration_number || "-" },
     { header: "Supplier", accessor: (row: any) => row.suppliers?.name || "-" },
     { header: "Product", accessor: (row: any) => row.products?.species || "-" },
-    { header: "Quantity", accessor: (row: any) => `${row.quantity} ${row.products?.unit_of_measurement || ""}` },
+    { header: "Harvest Qty", accessor: (row: any) => `${row.harvest_quantity || row.quantity} ${row.products?.unit_of_measurement || ""}` },
+    { header: "Purchase Qty", accessor: (row: any) => `${row.purchase_quantity || row.quantity} ${row.products?.unit_of_measurement || ""}` },
+    { header: "Remaining", accessor: (row: any) => `${row.remaining_quantity ?? row.purchase_quantity ?? row.quantity} ${row.products?.unit_of_measurement || ""}` },
+    { header: "Crates", accessor: (row: any) => row.num_crates || "-" },
     { header: "Zone", accessor: (row: any) => row.fishing_zones?.name || "-" },
   ];
 

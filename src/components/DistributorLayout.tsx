@@ -10,13 +10,15 @@ import {
   ShoppingCart,
   TrendingUp,
   Search,
-  Scale
+  Scale,
+  Settings
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/distributor", icon: LayoutDashboard },
   { name: "Purchases", href: "/distributor/purchases", icon: ShoppingCart },
   { name: "Grading", href: "/distributor/grading", icon: Scale },
+  { name: "Grade Setup", href: "/distributor/grade-management", icon: Settings },
   { name: "Sales", href: "/distributor/sales", icon: TrendingUp },
   { name: "Traceability", href: "/distributor/traceability", icon: Search },
   { name: "Suppliers", href: "/distributor/suppliers", icon: Users },

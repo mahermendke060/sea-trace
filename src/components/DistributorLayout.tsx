@@ -3,9 +3,7 @@ import { cn } from "@/lib/utils";
 import { 
   LayoutDashboard, 
   Anchor, 
-  Ship, 
   Fish, 
-  Users, 
   MapPin,
   ShoppingCart,
   TrendingUp,
@@ -21,7 +19,6 @@ const navigation = [
   { name: "Grade Setup", href: "/distributor/grade-management", icon: Settings },
   { name: "Sales", href: "/distributor/sales", icon: TrendingUp },
   { name: "Traceability", href: "/distributor/traceability", icon: Search },
-  { name: "Vessels", href: "/distributor/vessels", icon: Ship },
   { name: "Products", href: "/distributor/products", icon: Fish },
   { name: "Customers", href: "/distributor/customers", icon: Anchor },
   { name: "Locations", href: "/distributor/locations", icon: MapPin },

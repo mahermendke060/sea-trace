@@ -23,6 +23,7 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [purchases, setPurchases] = useState<any[]>([]);
   const [filteredPurchases, setFilteredPurchases] = useState<any[]>([]);
+  const [gradedPurchaseIds, setGradedPurchaseIds] = useState<Set<string>>(new Set());
   const [grades, setGrades] = useState<any[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
@@ -35,7 +36,7 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
 
   useEffect(() => {
     const fetchData = async () => {
-      const [suppliersData, purchasesData, gradesData] = await Promise.all([
+      const [suppliersData, purchasesData, gradesData, gradingsData] = await Promise.all([
         supabase.from("suppliers").select("*").order("name"),
         supabase
           .from("purchases")
@@ -52,24 +53,31 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
           .select("*")
           .eq("is_active", true)
           .order("sort_order", { ascending: true }),
+        supabase.from("grading").select("purchase_id"),
       ]);
       setSuppliers(suppliersData.data || []);
       setPurchases(purchasesData.data || []);
       setGrades(gradesData.data || []);
+      
+      // Get set of already graded purchase IDs
+      const gradedIds = new Set((gradingsData.data || []).map((g: any) => g.purchase_id));
+      setGradedPurchaseIds(gradedIds);
     };
     fetchData();
   }, []);
 
-  // Filter purchases when supplier changes
+  // Filter purchases when supplier changes - exclude already graded purchases
   useEffect(() => {
     if (selectedSupplierId) {
-      const filtered = purchases.filter(p => p.supplier_id === selectedSupplierId);
+      const filtered = purchases.filter(p => 
+        p.supplier_id === selectedSupplierId && !gradedPurchaseIds.has(p.id)
+      );
       setFilteredPurchases(filtered);
     } else {
       setFilteredPurchases([]);
     }
     setSelectedPurchase(null);
-  }, [selectedSupplierId, purchases]);
+  }, [selectedSupplierId, purchases, gradedPurchaseIds]);
 
   useEffect(() => {
     if (!open) {
@@ -255,7 +263,7 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
           {selectedPurchase && (
             <>
               {/* Purchase Details */}
-              <div className="grid grid-cols-2 gap-4 p-3 bg-muted/50 rounded-lg">
+              <div className="grid grid-cols-3 gap-4 p-3 bg-muted/50 rounded-lg">
                 <div>
                   <Label className="text-xs text-muted-foreground">Purchased From</Label>
                   <p className="font-medium">{selectedPurchase.suppliers?.name || "-"}</p>
@@ -263,6 +271,10 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
                 <div>
                   <Label className="text-xs text-muted-foreground">Purchased On</Label>
                   <p className="font-medium">{selectedPurchase.landing_date ? format(new Date(selectedPurchase.landing_date), "MMM dd, yyyy") : "-"}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Total Weight</Label>
+                  <p className="font-medium">{selectedPurchase.purchase_quantity || selectedPurchase.quantity || 0} {selectedPurchase.products?.unit_of_measurement}</p>
                 </div>
               </div>
 

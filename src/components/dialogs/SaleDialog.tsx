@@ -252,12 +252,17 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
                         <SelectValue placeholder="Select purchase" />
                       </SelectTrigger>
                       <SelectContent>
-                        {purchases.map((purchase) => (
-                          <SelectItem key={purchase.id} value={purchase.id}>
-                            {purchase.vessels?.registration_number} - {purchase.products?.species} 
-                            ({purchase.remaining_quantity || purchase.purchase_quantity || purchase.quantity} {purchase.products?.unit_of_measurement} avail.)
-                          </SelectItem>
-                        ))}
+                        {purchases
+                          .filter((p) => {
+                            const remaining = p.remaining_quantity ?? p.purchase_quantity ?? p.quantity ?? 0;
+                            return remaining > 0 && !p.is_downstream_purchase;
+                          })
+                          .map((purchase) => (
+                            <SelectItem key={purchase.id} value={purchase.id}>
+                              {purchase.vessels?.registration_number} - {purchase.products?.species} 
+                              ({purchase.remaining_quantity || purchase.purchase_quantity || purchase.quantity} {purchase.products?.unit_of_measurement} avail.)
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>

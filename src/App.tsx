@@ -28,11 +28,11 @@ import DistributorGrading from "./pages/distributor/Grading";
 import DistributorGradeManagement from "./pages/distributor/GradeManagement";
 import DistributorSales from "./pages/distributor/Sales";
 import DistributorTraceability from "./pages/distributor/Traceability";
-import DistributorSuppliers from "./pages/distributor/Suppliers";
 import DistributorVessels from "./pages/distributor/Vessels";
 import DistributorProducts from "./pages/distributor/Products";
 import DistributorCustomers from "./pages/distributor/Customers";
 import DistributorLocations from "./pages/distributor/Locations";
+import DistributorPortal from "./pages/distributor/DistributorPortal";
 
 import NotFound from "./pages/NotFound";
 
@@ -78,11 +78,13 @@ const App = () => (
           <Route path="/distributor/grade-management" element={<DistributorLayout><DistributorGradeManagement /></DistributorLayout>} />
           <Route path="/distributor/sales" element={<DistributorLayout><DistributorSales /></DistributorLayout>} />
           <Route path="/distributor/traceability" element={<DistributorLayout><DistributorTraceability /></DistributorLayout>} />
-          <Route path="/distributor/suppliers" element={<DistributorLayout><DistributorSuppliers /></DistributorLayout>} />
           <Route path="/distributor/vessels" element={<DistributorLayout><DistributorVessels /></DistributorLayout>} />
           <Route path="/distributor/products" element={<DistributorLayout><DistributorProducts /></DistributorLayout>} />
           <Route path="/distributor/customers" element={<DistributorLayout><DistributorCustomers /></DistributorLayout>} />
           <Route path="/distributor/locations" element={<DistributorLayout><DistributorLocations /></DistributorLayout>} />
+          
+          {/* Individual Distributor Portals */}
+          <Route path="/distributor/:distributorName" element={<DistributorPortal />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

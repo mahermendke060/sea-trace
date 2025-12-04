@@ -15,6 +15,7 @@ export default function Customers() {
     const { data } = await supabase
       .from("customers")
       .select("*, locations(name)")
+      .eq("portal", "seachain")
       .order("created_at", { ascending: false });
     setCustomers(data || []);
   };

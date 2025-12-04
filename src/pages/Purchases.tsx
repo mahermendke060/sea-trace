@@ -31,6 +31,7 @@ export default function Purchases() {
   }, []);
 
   const columns = [
+    { header: "Purchase Order No.", accessor: (row: any) => `PO-${String(row._seq || 0).padStart(4, "0")}` },
     { header: "Landing Date", accessor: (row: any) => format(new Date(row.landing_date), "MMM dd, yyyy") },
     { header: "Vessel", accessor: (row: any) => row.vessels?.registration_number || "-" },
     { header: "Supplier", accessor: (row: any) => row.suppliers?.name || "-" },
@@ -68,7 +69,7 @@ export default function Purchases() {
         <CardContent>
           <DataTable 
             columns={columns} 
-            data={purchases} 
+            data={purchases.map((p, i) => ({ ...p, _seq: i + 1 }))} 
             onEdit={(purchase) => { setSelectedPurchase(purchase); setDialogOpen(true); }}
             onDelete={handleDelete}
           />

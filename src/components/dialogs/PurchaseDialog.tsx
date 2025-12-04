@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,10 +18,15 @@ interface PurchaseDialogProps {
 
 export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: PurchaseDialogProps) => {
   const { toast } = useToast();
+
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [vessels, setVessels] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [zones, setZones] = useState<any[]>([]);
+  const [numCratesAuto, setNumCratesAuto] = useState(true);
+  const today = new Date().toISOString().slice(0, 10);
+  const [purchaseQtyWarning, setPurchaseQtyWarning] = useState("");
+
   const [formData, setFormData] = useState({
     supplier_id: "",
     vessel_id: "",
@@ -29,28 +35,56 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
     harvest_quantity: "",
     purchase_quantity: "",
     num_crates: "",
-    gear_type: "",
+    gear_type: "Trap/Pots",
     trip_start_date: "",
     trip_end_date: "",
-    landing_date: "",
+    landing_date: today,
     notes: "",
   });
 
   useEffect(() => {
     const fetchData = async () => {
-      const [suppliersData, vesselsData, productsData, zonesData] = await Promise.all([
+      const [suppliersData, productsData, zonesData] = await Promise.all([
         supabase.from("suppliers").select("*"),
-        supabase.from("vessels").select("*"),
         supabase.from("products").select("*"),
         supabase.from("fishing_zones").select("*"),
       ]);
       setSuppliers(suppliersData.data || []);
-      setVessels(vesselsData.data || []);
       setProducts(productsData.data || []);
       setZones(zonesData.data || []);
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+    const fetchVessels = async () => {
+      if (!open) return;
+      if (!formData.supplier_id) {
+        setVessels([]);
+        setFormData((prev) => ({ ...prev, vessel_id: "", gear_type: "Trap/Pots" }));
+        return;
+      }
+      const { data } = await supabase
+        .from("vessels")
+        .select("*")
+        .eq("supplier_id", formData.supplier_id);
+      const list = data || [];
+      setVessels(list);
+      setFormData((prev) => ({
+        ...prev,
+        vessel_id: list.some((v) => v.id === prev.vessel_id) ? prev.vessel_id : "",
+      }));
+    };
+    fetchVessels();
+  }, [open, formData.supplier_id]);
+
+  useEffect(() => {
+    if (!formData.vessel_id) return;
+    const v = vessels.find((x) => x.id === formData.vessel_id);
+    if (v && v.gear_type && formData.gear_type !== v.gear_type) {
+      setFormData((prev) => ({ ...prev, gear_type: v.gear_type }));
+    }
+  }, [formData.vessel_id, vessels]);
 
   useEffect(() => {
     if (purchase) {
@@ -62,12 +96,14 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
         harvest_quantity: purchase.harvest_quantity?.toString() || purchase.quantity?.toString() || "",
         purchase_quantity: purchase.purchase_quantity?.toString() || purchase.quantity?.toString() || "",
         num_crates: purchase.num_crates?.toString() || "",
-        gear_type: purchase.gear_type || "",
+        gear_type: purchase.gear_type || "Trap/Pots",
         trip_start_date: purchase.trip_start_date || "",
         trip_end_date: purchase.trip_end_date || "",
-        landing_date: purchase.landing_date || "",
+        landing_date: purchase.landing_date || today,
         notes: purchase.notes || "",
       });
+      setNumCratesAuto(false);
+      setPurchaseQtyWarning("");
     } else {
       setFormData({
         supplier_id: "",
@@ -77,19 +113,38 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
         harvest_quantity: "",
         purchase_quantity: "",
         num_crates: "",
-        gear_type: "",
+        gear_type: "Trap/Pots",
         trip_start_date: "",
         trip_end_date: "",
-        landing_date: "",
+        landing_date: today,
         notes: "",
       });
+      setNumCratesAuto(true);
+      setPurchaseQtyWarning("");
     }
   }, [purchase, open]);
+
+  useEffect(() => {
+    if (!numCratesAuto) return;
+    const qty = parseFloat(formData.purchase_quantity);
+    if (isNaN(qty)) {
+      setFormData((prev) => ({ ...prev, num_crates: "" }));
+      return;
+    }
+    const autoCrates = Math.round(qty / 30);
+    setFormData((prev) => ({ ...prev, num_crates: autoCrates ? String(autoCrates) : "0" }));
+  }, [formData.purchase_quantity, numCratesAuto]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const purchaseQty = parseFloat(formData.purchase_quantity);
+    const harvestQty = parseFloat(formData.harvest_quantity);
+    if (!isNaN(purchaseQty) && !isNaN(harvestQty) && purchaseQty > harvestQty) {
+      setPurchaseQtyWarning("Enter a valid purchase quantity less than or equal to harvest quantity.");
+      return;
+    }
+
     const submitData = {
       supplier_id: formData.supplier_id,
       vessel_id: formData.vessel_id,
@@ -97,10 +152,10 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
       fishing_zone_id: formData.fishing_zone_id,
       harvest_quantity: parseFloat(formData.harvest_quantity),
       purchase_quantity: purchaseQty,
-      quantity: purchaseQty, // Keep for backward compatibility
+      quantity: purchaseQty, 
       remaining_quantity: purchase ? purchase.remaining_quantity : purchaseQty,
       num_crates: formData.num_crates ? parseFloat(formData.num_crates) : null,
-      gear_type: formData.gear_type || null,
+      gear_type: formData.gear_type || "Trap/Pots",
       trip_start_date: formData.trip_start_date,
       trip_end_date: formData.trip_end_date,
       landing_date: formData.landing_date,
@@ -118,10 +173,6 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
         variant: "destructive",
       });
     } else {
-      toast({
-        title: "Success",
-        description: `Purchase ${purchase ? "updated" : "recorded"} successfully`,
-      });
       onSuccess();
       onOpenChange(false);
     }
@@ -152,9 +203,13 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
             </div>
             <div className="space-y-2">
               <Label htmlFor="vessel_id">Vessel *</Label>
-              <Select value={formData.vessel_id} onValueChange={(value) => setFormData({ ...formData, vessel_id: value })}>
+              <Select
+                value={formData.vessel_id}
+                onValueChange={(value) => setFormData({ ...formData, vessel_id: value })}
+                disabled={!formData.supplier_id}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select vessel" />
+                  <SelectValue placeholder={formData.supplier_id ? "Select vessel" : "Select supplier first"} />
                 </SelectTrigger>
                 <SelectContent>
                   {vessels.map((vessel) => (
@@ -214,10 +269,23 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
                 type="number"
                 step="0.01"
                 value={formData.purchase_quantity}
-                onChange={(e) => setFormData({ ...formData, purchase_quantity: e.target.value })}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setPurchaseQtyWarning("");
+                  const h = parseFloat(formData.harvest_quantity);
+                  const n = parseFloat(next);
+                  if (!isNaN(h) && !isNaN(n) && n > h) {
+                    setPurchaseQtyWarning("Enter a valid purchase quantity less than or equal to harvest quantity.");
+                    return;
+                  }
+                  setFormData({ ...formData, purchase_quantity: next });
+                }}
                 required
                 placeholder="Quantity purchased"
               />
+              {purchaseQtyWarning && (
+                <p className="text-xs text-amber-600">{purchaseQtyWarning}</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="num_crates">Number of Crates Used</Label>
@@ -226,17 +294,16 @@ export const PurchaseDialog = ({ open, onOpenChange, purchase, onSuccess }: Purc
                 type="number"
                 step="1"
                 value={formData.num_crates}
-                onChange={(e) => setFormData({ ...formData, num_crates: e.target.value })}
-                placeholder="Number of crates"
+                onChange={(e) => {
+                  setFormData({ ...formData, num_crates: e.target.value });
+                  setNumCratesAuto(false);
+                }}
+                placeholder="Auto-calculated as Purchase Qty / 30"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="gear_type">Gear Type</Label>
-              <Input
-                id="gear_type"
-                value={formData.gear_type}
-                onChange={(e) => setFormData({ ...formData, gear_type: e.target.value })}
-              />
+              <Input id="gear_type" value={formData.gear_type} readOnly />
             </div>
             <div className="space-y-2">
               <Label htmlFor="trip_start_date">Trip Start Date *</Label>

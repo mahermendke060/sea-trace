@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { DataTable } from "@/components/DataTable";
 import { DistributorSaleDialog } from "@/components/dialogs/DistributorSaleDialog";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 
 const gradeLabels: Record<string, string> = {
   culls: "Culls",
@@ -23,6 +23,7 @@ export default function DistributorSales() {
   const [sales, setSales] = useState<any[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedSale, setSelectedSale] = useState<any>(null);
+  const { toast } = useToast();
 
   const fetchSales = async () => {
     const { data } = await supabase
@@ -46,33 +47,42 @@ export default function DistributorSales() {
   }, []);
 
   const columns = [
+    { header: "Sales Order No.", accessor: (row: any) => `SO-${String(row._seq || 0).padStart(4, "0")}` },
     { header: "Sale Date", accessor: (row: any) => format(new Date(row.sale_date), "MMM dd, yyyy") },
-    { header: "Seller", accessor: (row: any) => row.suppliers?.name || "-" },
     { header: "Customer", accessor: (row: any) => row.customers?.name || "-" },
-    { 
-      header: "Items", 
+    {
+      header: "Product Name",
       accessor: (row: any) => {
         const items = row.sale_items || [];
-        return items.length > 0 
-          ? items.map((item: any) => (
-              <div key={item.id} className="text-sm">
-                {item.quantity} {item.products?.unit_of_measurement} {item.products?.species}
-                {item.grading?.grade && (
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    {gradeLabels[item.grading.grade] || item.grading.grade}
-                  </Badge>
-                )}
-              </div>
-            ))
+        return items.length > 0
+          ? items
+              .map(
+                (item: any) =>
+                  `${item.quantity} ${item.products?.unit_of_measurement} ${item.products?.species}`
+              )
+              .join(", ")
           : "-";
-      }
+      },
     },
   ];
 
   const handleDelete = async (sale: any) => {
+    if (!sale?.id) {
+      toast({ title: "Delete failed", description: "Missing sale ID.", variant: "destructive" });
+      return;
+    }
     if (!confirm("Delete this sale?")) return;
-    await supabase.from("sales").delete().eq("id", sale.id);
-    fetchSales();
+    try {
+      const { error } = await supabase.from("sales").delete().eq("id", sale.id);
+      if (error) {
+        toast({ title: "Delete failed", description: error.message, variant: "destructive" });
+      } else {
+        toast({ title: "Sale deleted" });
+        fetchSales();
+      }
+    } catch (e: any) {
+      toast({ title: "Delete failed", description: e?.message || String(e), variant: "destructive" });
+    }
   };
 
   return (

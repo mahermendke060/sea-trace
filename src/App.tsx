@@ -32,6 +32,7 @@ import DistributorProducts from "./pages/distributor/Products";
 import DistributorCustomers from "./pages/distributor/Customers";
 import DistributorLocations from "./pages/distributor/Locations";
 import DistributorPortal from "./pages/distributor/DistributorPortal";
+import DistributorSuppliers from "./pages/distributor/Suppliers";
 
 import NotFound from "./pages/NotFound";
 
@@ -78,6 +79,7 @@ const App = () => (
           <Route path="/distributor/sales" element={<DistributorLayout><DistributorSales /></DistributorLayout>} />
           <Route path="/distributor/traceability" element={<DistributorLayout><DistributorTraceability /></DistributorLayout>} />
           <Route path="/distributor/products" element={<DistributorLayout><DistributorProducts /></DistributorLayout>} />
+          <Route path="/distributor/suppliers" element={<DistributorLayout><DistributorSuppliers /></DistributorLayout>} />
           <Route path="/distributor/customers" element={<DistributorLayout><DistributorCustomers /></DistributorLayout>} />
           <Route path="/distributor/locations" element={<DistributorLayout><DistributorLocations /></DistributorLayout>} />
           

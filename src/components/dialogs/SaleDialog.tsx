@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { format } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,12 +27,15 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
     sale_date: "",
     notes: "",
   });
-  const [saleItems, setSaleItems] = useState<any[]>([{
-    purchase_id: "",
-    quantity: "",
-    percentage_used: "",
-    num_crates: "",
-  }]);
+  const [saleItems, setSaleItems] = useState<any[]>([
+    {
+      purchase_id: "",
+      quantity: "",
+      percentage_used: "",
+      num_crates: "",
+      num_crates_manual: false,
+    },
+  ]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,12 +44,15 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
         supabase.from("customers").select("*"),
         supabase
           .from("purchases")
-          .select("*, products(species, unit_of_measurement), vessels(registration_number)")
+          .select("*, products(species, unit_of_measurement), vessels(registration_number), suppliers(name)")
           .gt("remaining_quantity", 0),
       ]);
       setSuppliers(suppliersData.data || []);
       setCustomers(customersData.data || []);
-      setPurchases(purchasesData.data || []);
+      const list = (purchasesData.data || [])
+        .sort((a: any, b: any) => new Date(a.landing_date).getTime() - new Date(b.landing_date).getTime())
+        .map((p: any, idx: number) => ({ ...p, _seq: idx + 1 }));
+      setPurchases(list);
     };
     if (open) {
       fetchData();
@@ -65,7 +72,15 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
         sale_date: new Date().toISOString().split("T")[0],
         notes: "",
       });
-      setSaleItems([{ purchase_id: "", quantity: "", percentage_used: "", num_crates: "" }]);
+      setSaleItems([
+        {
+          purchase_id: "",
+          quantity: "",
+          percentage_used: "",
+          num_crates: "",
+          num_crates_manual: false,
+        },
+      ]);
     }
   }, [sale, open]);
 
@@ -87,18 +102,22 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
     const item = newItems[index];
     const purchase = purchases.find((p) => p.id === item.purchase_id);
     const baseQty = purchase?.remaining_quantity || purchase?.purchase_quantity || purchase?.quantity || 0;
+
     // Subtract any quantities already allocated in other rows for the same purchase
     const allocatedElsewhere = saleItems
       .filter((si, i) => i !== index && si.purchase_id === item.purchase_id && si.quantity)
       .reduce((sum, si) => sum + (parseFloat(si.quantity) || 0), 0);
     const purchaseQty = Math.max(0, baseQty - allocatedElsewhere);
 
+    const n = parseFloat(quantity);
+    const autoCrates = !item.num_crates_manual && !isNaN(n) ? Math.round(n / 30) : undefined;
     newItems[index] = {
       ...item,
       quantity,
       percentage_used: purchaseQty > 0 && quantity
         ? ((parseFloat(quantity) / purchaseQty) * 100).toFixed(2)
         : "",
+      num_crates: autoCrates !== undefined ? String(autoCrates) : item.num_crates,
     };
     setSaleItems(newItems);
   };
@@ -109,17 +128,22 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
     const item = newItems[index];
     const purchase = purchases.find((p) => p.id === item.purchase_id);
     const baseQty = purchase?.remaining_quantity || purchase?.purchase_quantity || purchase?.quantity || 0;
+
     const allocatedElsewhere = saleItems
       .filter((si, i) => i !== index && si.purchase_id === item.purchase_id && si.quantity)
       .reduce((sum, si) => sum + (parseFloat(si.quantity) || 0), 0);
     const purchaseQty = Math.max(0, baseQty - allocatedElsewhere);
 
+    const computedQty = purchaseQty > 0 && percentage
+      ? ((parseFloat(percentage) / 100) * purchaseQty).toFixed(2)
+      : "";
+    const n = parseFloat(computedQty);
+    const autoCrates = !item.num_crates_manual && !isNaN(n) ? Math.round(n / 30) : undefined;
     newItems[index] = {
       ...item,
       percentage_used: percentage,
-      quantity: purchaseQty > 0 && percentage
-        ? ((parseFloat(percentage) / 100) * purchaseQty).toFixed(2)
-        : "",
+      quantity: computedQty,
+      num_crates: autoCrates !== undefined ? String(autoCrates) : item.num_crates,
     };
     setSaleItems(newItems);
   };
@@ -191,7 +215,16 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
   };
 
   const addItem = () => {
-    setSaleItems([...saleItems, { purchase_id: "", quantity: "", percentage_used: "", num_crates: "" }]);
+    setSaleItems([
+      ...saleItems,
+      {
+        purchase_id: "",
+        quantity: "",
+        percentage_used: "",
+        num_crates: "",
+        num_crates_manual: false,
+      },
+    ]);
   };
 
   const removeItem = (index: number) => {
@@ -208,7 +241,10 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="customer_id">Customer *</Label>
-              <Select value={formData.customer_id} onValueChange={(value) => setFormData({ ...formData, customer_id: value })}>
+              <Select
+                value={formData.customer_id}
+                onValueChange={(value) => setFormData({ ...formData, customer_id: value })}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select customer" />
                 </SelectTrigger>
@@ -287,8 +323,7 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
                             const dynRemaining = Math.max(0, base - allocated);
                             return (
                               <SelectItem key={purchase.id} value={purchase.id}>
-                                {purchase.vessels?.registration_number} - {purchase.products?.species}
-                                ({dynRemaining} {purchase.products?.unit_of_measurement} avail.)
+                                {format(new Date(purchase.landing_date), "MMM dd, yyyy")} · {`PO-${String(purchase._seq || 0).padStart(4, "0")}`} · {purchase.products?.species} ({dynRemaining} {purchase.products?.unit_of_measurement} avail.) · {purchase.suppliers?.name}{purchase.vessels?.registration_number ? ` - ${purchase.vessels.registration_number}` : ""}
                               </SelectItem>
                             );
                           })}
@@ -327,6 +362,7 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
                       onChange={(e) => {
                         const newItems = [...saleItems];
                         newItems[index].num_crates = e.target.value;
+                        newItems[index].num_crates_manual = true;
                         setSaleItems(newItems);
                       }}
                       placeholder="Crates"
@@ -337,17 +373,16 @@ export const SaleDialog = ({ open, onOpenChange, sale, onSuccess }: SaleDialogPr
                       <span>Avail: {availableQty}</span>
                     )}
                   </div>
-                  <div className="col-span-1">
-                    {saleItems.length > 1 && (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeItem(index)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    )}
+                  <div className="col-span-1 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeItem(index)}
+                      aria-label="Remove item"
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
                   </div>
                 </div>
               );

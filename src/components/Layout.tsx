@@ -49,7 +49,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
             </button>
             <Ship className="h-8 w-8" />
             <div>
-              <h1 className="text-2xl font-bold">Cyananalytics</h1>
+              <h1 className="text-2xl font-bold">Cyan Analytics</h1>
               <p className="text-sm text-white/80">Seafood Supply Chain Management</p>
             </div>
           </div>
@@ -92,7 +92,7 @@ export const Layout = ({ children }: { children: React.ReactNode }) => {
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <Ship className="h-6 w-6" />
-                  <span className="font-semibold">Cyananalytics</span>
+                  <span className="font-semibold">Cyan Analytics</span>
                 </div>
                 <button
                   className="inline-flex items-center justify-center p-2 rounded-md hover:bg-muted"

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus } from "lucide-react";
 import { DataTable } from "@/components/DataTable";
-import { LocationDialog } from "@/components/dialogs/LocationDialog";
+import { DistributorLocationDialog } from "@/components/dialogs/DistributorLocationDialog";
 
 export default function DistributorLocations() {
   const [locations, setLocations] = useState<any[]>([]);
@@ -12,7 +12,7 @@ export default function DistributorLocations() {
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
 
   const fetchLocations = async () => {
-    const { data } = await supabase.from("locations").select("*").order("name");
+    const { data } = await supabase.from("distributor_locations").select("*").order("name");
     setLocations(data || []);
   };
 
@@ -49,7 +49,7 @@ export default function DistributorLocations() {
 
   const handleDelete = async (location: any) => {
     if (!confirm(`Delete location "${location.name}"?`)) return;
-    await supabase.from("locations").delete().eq("id", location.id);
+    await supabase.from("distributor_locations").delete().eq("id", location.id);
     fetchLocations();
   };
 
@@ -70,7 +70,7 @@ export default function DistributorLocations() {
           <DataTable columns={columns} data={locations} onEdit={(l) => { setSelectedLocation(l); setDialogOpen(true); }} onDelete={handleDelete} />
         </CardContent>
       </Card>
-      <LocationDialog open={dialogOpen} onOpenChange={setDialogOpen} location={selectedLocation} onSuccess={fetchLocations} />
+      <DistributorLocationDialog open={dialogOpen} onOpenChange={setDialogOpen} location={selectedLocation} onSuccess={fetchLocations} />
     </div>
   );
 }

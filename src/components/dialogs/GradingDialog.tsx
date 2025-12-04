@@ -25,6 +25,7 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
   const [filteredPurchases, setFilteredPurchases] = useState<any[]>([]);
   const [gradedPurchaseIds, setGradedPurchaseIds] = useState<Set<string>>(new Set());
   const [grades, setGrades] = useState<any[]>([]);
+  const [poLabels, setPoLabels] = useState<Record<string, string>>({});
   const [selectedSupplierId, setSelectedSupplierId] = useState("");
   const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
   const [gradeItems, setGradeItems] = useState<any[]>([{ grade: "", quantity: "", percentage: "" }]);
@@ -37,14 +38,15 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
   useEffect(() => {
     const fetchData = async () => {
       const [suppliersData, purchasesData, gradesData, gradingsData] = await Promise.all([
-        supabase.from("suppliers").select("*").order("name"),
+        // SeaChain customers become the supplier choices for distributor grading
+        supabase.from("customers").select("id, name").eq("portal", "seachain").order("name"),
         supabase
           .from("purchases")
           .select(`
             *,
             products(id, species, unit_of_measurement),
             vessels(registration_number),
-            suppliers(id, name)
+            customers!purchases_downstream_customer_id_fkey(id, name)
           `)
           .eq("is_downstream_purchase", true)
           .order("landing_date", { ascending: false }),
@@ -56,7 +58,14 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
         supabase.from("grading").select("purchase_id"),
       ]);
       setSuppliers(suppliersData.data || []);
-      setPurchases(purchasesData.data || []);
+      const rows = purchasesData.data || [];
+      setPurchases(rows);
+      // Build PO labels deterministically by landing_date ascending
+      const sortedAsc = [...rows].sort((a: any, b: any) => new Date(a.landing_date).getTime() - new Date(b.landing_date).getTime());
+      const poMap: Record<string, string> = {};
+      let counter = 0;
+      sortedAsc.forEach((p: any) => { counter += 1; poMap[p.id] = `PO-${String(counter).padStart(4, "0")}`; });
+      setPoLabels(poMap);
       setGrades(gradesData.data || []);
       
       // Get set of already graded purchase IDs
@@ -70,7 +79,7 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
   useEffect(() => {
     if (selectedSupplierId) {
       const filtered = purchases.filter(p => 
-        p.supplier_id === selectedSupplierId && !gradedPurchaseIds.has(p.id)
+        p.downstream_customer_id === selectedSupplierId && !gradedPurchaseIds.has(p.id)
       );
       setFilteredPurchases(filtered);
     } else {
@@ -247,13 +256,20 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
                   {filteredPurchases.length === 0 ? (
                     <SelectItem value="none" disabled>No purchases from this supplier</SelectItem>
                   ) : (
-                    filteredPurchases.map((purchase) => (
-                      <SelectItem key={purchase.id} value={purchase.id}>
-                        {purchase.vessels?.registration_number} - {purchase.products?.species} 
-                        ({purchase.purchase_quantity || purchase.quantity} {purchase.products?.unit_of_measurement}) 
-                        - {format(new Date(purchase.landing_date), "MMM dd, yyyy")}
-                      </SelectItem>
-                    ))
+                    filteredPurchases.map((purchase) => {
+                      const dateStr = format(new Date(purchase.landing_date), "MMM dd, yyyy");
+                      const po = poLabels[purchase.id] || purchase.id;
+                      const prod = purchase.products?.species || "-";
+                      const qty = purchase.purchase_quantity || purchase.quantity || 0;
+                      const unit = purchase.products?.unit_of_measurement || "";
+                      const supplierName = purchase.customers?.name || "-";
+                      const vesselReg = purchase.vessels?.registration_number || "-";
+                      return (
+                        <SelectItem key={purchase.id} value={purchase.id}>
+                          {dateStr} · {po} · {prod} ({qty} {unit}) · {supplierName} · {vesselReg}
+                        </SelectItem>
+                      );
+                    })
                   )}
                 </SelectContent>
               </Select>
@@ -266,7 +282,7 @@ export const GradingDialog = ({ open, onOpenChange, grading, onSuccess }: Gradin
               <div className="grid grid-cols-3 gap-4 p-3 bg-muted/50 rounded-lg">
                 <div>
                   <Label className="text-xs text-muted-foreground">Purchased From</Label>
-                  <p className="font-medium">{selectedPurchase.suppliers?.name || "-"}</p>
+                  <p className="font-medium">{selectedPurchase.customers?.name || "-"}</p>
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Purchased On</Label>

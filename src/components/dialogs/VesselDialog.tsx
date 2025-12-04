@@ -20,8 +20,9 @@ export const VesselDialog = ({ open, onOpenChange, vessel, onSuccess }: VesselDi
   const [formData, setFormData] = useState({
     registration_number: "",
     license_number: "",
-    gear_type: "",
+    gear_type: "Trap/Pots",
     supplier_id: "",
+    captain_name: "",
   });
 
   useEffect(() => {
@@ -37,15 +38,17 @@ export const VesselDialog = ({ open, onOpenChange, vessel, onSuccess }: VesselDi
       setFormData({
         registration_number: vessel.registration_number || "",
         license_number: vessel.license_number || "",
-        gear_type: vessel.gear_type || "",
+        gear_type: vessel.gear_type || "Trap/Pots",
         supplier_id: vessel.supplier_id || "",
+        captain_name: vessel.captain_name || "",
       });
     } else {
       setFormData({
         registration_number: "",
         license_number: "",
-        gear_type: "",
+        gear_type: "Trap/Pots",
         supplier_id: "",
+        captain_name: "",
       });
     }
   }, [vessel, open]);
@@ -53,9 +56,17 @@ export const VesselDialog = ({ open, onOpenChange, vessel, onSuccess }: VesselDi
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const payload = {
+      registration_number: formData.registration_number,
+      license_number: formData.license_number,
+      gear_type: formData.gear_type,
+      supplier_id: formData.supplier_id,
+      captain_name: formData.captain_name,
+    } as any;
+
     const { error } = vessel
-      ? await supabase.from("vessels").update(formData).eq("id", vessel.id)
-      : await supabase.from("vessels").insert([formData]);
+      ? await supabase.from("vessels").update(payload).eq("id", vessel.id)
+      : await supabase.from("vessels").insert([payload]);
 
     if (error) {
       toast({
@@ -81,6 +92,29 @@ export const VesselDialog = ({ open, onOpenChange, vessel, onSuccess }: VesselDi
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
+            <Label htmlFor="supplier_id">Supplier</Label>
+            <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select supplier" />
+              </SelectTrigger>
+              <SelectContent>
+                {suppliers.map((supplier) => (
+                  <SelectItem key={supplier.id} value={supplier.id}>
+                    {supplier.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="captain_name">Captain Name</Label>
+            <Input
+              id="captain_name"
+              value={formData.captain_name}
+              onChange={(e) => setFormData({ ...formData, captain_name: e.target.value })}
+            />
+          </div>
+          <div className="space-y-2">
             <Label htmlFor="registration_number">Registration Number *</Label>
             <Input
               id="registration_number"
@@ -99,27 +133,16 @@ export const VesselDialog = ({ open, onOpenChange, vessel, onSuccess }: VesselDi
           </div>
           <div className="space-y-2">
             <Label htmlFor="gear_type">Gear Type</Label>
-            <Input
-              id="gear_type"
-              value={formData.gear_type}
-              onChange={(e) => setFormData({ ...formData, gear_type: e.target.value })}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="supplier_id">Supplier</Label>
-            <Select value={formData.supplier_id} onValueChange={(value) => setFormData({ ...formData, supplier_id: value })}>
+            <Select value={formData.gear_type} onValueChange={(value) => setFormData({ ...formData, gear_type: value })}>
               <SelectTrigger>
-                <SelectValue placeholder="Select supplier" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {suppliers.map((supplier) => (
-                  <SelectItem key={supplier.id} value={supplier.id}>
-                    {supplier.name}
-                  </SelectItem>
-                ))}
+                <SelectItem value="Trap/Pots">Trap/Pots</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel

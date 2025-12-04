@@ -144,7 +144,6 @@ export default function Grading() {
             <TableHeader>
               <TableRow>
                 <TableHead>Purchase ID</TableHead>
-                <TableHead>Vessel / Supplier</TableHead>
                 <TableHead>Product</TableHead>
                 <TableHead>Purchase Date</TableHead>
                 <TableHead>Total Weight</TableHead>
@@ -156,7 +155,7 @@ export default function Grading() {
             <TableBody>
               {groupedGradings.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                     No grading records found
                   </TableCell>
                 </TableRow>
@@ -165,10 +164,6 @@ export default function Grading() {
                   <TableRow key={group.purchase_id}>
                     <TableCell className="font-mono text-xs">
                       {group.purchase_id.slice(0, 8)}...
-                    </TableCell>
-                    <TableCell>
-                      <div className="font-medium">{group.vessel}</div>
-                      <div className="text-xs text-muted-foreground">{group.supplier}</div>
                     </TableCell>
                     <TableCell>{group.product}</TableCell>
                     <TableCell>

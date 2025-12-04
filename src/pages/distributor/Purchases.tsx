@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
 import { DataTable } from "@/components/DataTable";
 import { format } from "date-fns";
+import { ChevronDown, ChevronRight } from "lucide-react";
 
 export default function DistributorPurchases() {
   const [purchases, setPurchases] = useState<any[]>([]);
   const [poLabels, setPoLabels] = useState<Record<string, string>>({});
   const [saleLabels, setSaleLabels] = useState<Record<string, string>>({});
+  const [saleSupplierMap, setSaleSupplierMap] = useState<Record<string, string>>({});
+
   const [saleHarvestMap, setSaleHarvestMap] = useState<Record<string, number>>({});
   const [saleUpstreamMap, setSaleUpstreamMap] = useState<Record<string, { harvest_quantity?: number; purchase_quantity?: number }>>({});
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [selectedRow, setSelectedRow] = useState<any | null>(null);
 
   const fetchPurchases = async () => {
     const { data } = await supabase
@@ -22,12 +31,10 @@ export default function DistributorPurchases() {
         fishing_zones(name),
         customers!purchases_downstream_customer_id_fkey(name)
       `)
-      .eq("is_downstream_purchase", true)
+      .or("is_downstream_purchase.is.true,source_sale_id.not.is.null")
       .order("landing_date", { ascending: true });
     const rows = data || [];
-    setPurchases(rows);
 
-    // If some downstream purchases don't have harvest_quantity, attempt to derive it
     const saleIdsNeedingHarvest = Array.from(
       new Set(
         rows
@@ -63,36 +70,47 @@ export default function DistributorPurchases() {
       setSaleUpstreamMap({});
     }
 
-    // Build and persist user-visible labels (UI only, stable)
-    let poMap: Record<string, string> = {};
-    let saleMap: Record<string, string> = {};
-    try {
-      const storedPO = localStorage.getItem("po_labels");
-      const storedSA = localStorage.getItem("sale_labels");
-      poMap = storedPO ? JSON.parse(storedPO) : {};
-      saleMap = storedSA ? JSON.parse(storedSA) : {};
-    } catch {}
+    // Build SO labels and supplier map from SeaChain sales table (so it matches SeaChain panel numbering)
+    const { data: allSales } = await supabase
+      .from("sales")
+      .select("id, sale_date, created_at, customers(name)")
+      .order("sale_date", { ascending: false })
+      .order("created_at", { ascending: false, nullsFirst: false })
+      .order("id", { ascending: true });
 
-    let poCounter = Object.keys(poMap).length;
-    let saCounter = Object.keys(saleMap).length;
+    const saleMap: Record<string, string> = {};
+    const supplierBySaleId: Record<string, string> = {};
+    (allSales || []).forEach((s: any, idx: number) => {
+      saleMap[s.id] = `SO-${String(idx + 1).padStart(4, "0")}`;
+      supplierBySaleId[s.id] = s.customers?.name || "-";
+    });
 
-    rows.forEach((row: any) => {
-      if (!poMap[row.id]) {
-        poCounter += 1;
-        poMap[row.id] = `PO-${String(poCounter).padStart(3, "0")}`;
-      }
-      if (row.source_sale_id && !saleMap[row.source_sale_id]) {
-        saCounter += 1;
-        saleMap[row.source_sale_id] = `SA-${String(saCounter).padStart(3, "0")}`;
-      }
+    // Sort distributor purchases by SO number ascending (unknowns at bottom)
+    const sortKey = (row: any) => {
+      const lbl = row.source_sale_id ? saleMap[row.source_sale_id] : null;
+      if (!lbl) return Number.POSITIVE_INFINITY;
+      const n = parseInt(lbl.replace(/\D/g, ""), 10);
+      return isNaN(n) ? Number.POSITIVE_INFINITY : n;
+    };
+    const sorted = [...rows].sort((a, b) => sortKey(a) - sortKey(b));
+
+    // Fresh PO numbering based on sorted order only
+    const poMap: Record<string, string> = {};
+    let poCounter = 0;
+    sorted.forEach((row: any) => {
+      poCounter += 1;
+      poMap[row.id] = `PO-${String(poCounter).padStart(4, "0")}`;
     });
 
     setPoLabels(poMap);
     setSaleLabels(saleMap);
-    try {
-      localStorage.setItem("po_labels", JSON.stringify(poMap));
-      localStorage.setItem("sale_labels", JSON.stringify(saleMap));
-    } catch {}
+    setSaleSupplierMap(supplierBySaleId);
+
+    // Now set purchases and expansion state
+    setPurchases(sorted);
+    const exp: Record<string, boolean> = {};
+    sorted.forEach((r: any) => { exp[r.id] = false; });
+    setExpanded(exp);
   };
 
   useEffect(() => {
@@ -105,27 +123,30 @@ export default function DistributorPurchases() {
       accessor: (row: any) => {
         const po = poLabels[row.id] || row.id;
         return (
-          <details>
-            <summary className="cursor-pointer text-emerald-700 hover:underline">
-              {po}
-            </summary>
-            <div className="mt-2 text-sm space-y-1">
-              <div><strong>Sale ID:</strong> {row.source_sale_id ? (saleLabels[row.source_sale_id] || row.source_sale_id) : "-"}</div>
-              <div><strong>Supplier:</strong> {row.suppliers?.name || "-"}</div>
-              <div><strong>Vessel:</strong> {row.vessels?.registration_number || "-"}</div>
-              <div><strong>Product:</strong> {row.products?.species || "-"}</div>
-              <div><strong>Harvest Qty:</strong> {(row.harvest_quantity ?? saleUpstreamMap[row.source_sale_id]?.harvest_quantity ?? saleHarvestMap[row.source_sale_id]) ?? "-"} {row.products?.unit_of_measurement || ""}</div>
-              <div><strong>Purchase Qty:</strong> {(row.purchase_quantity ?? saleUpstreamMap[row.source_sale_id]?.purchase_quantity ?? row.quantity) ?? "-"} {row.products?.unit_of_measurement || ""}</div>
-            </div>
-          </details>
+          <span className="text-emerald-700 font-medium">{po}</span>
         );
       }
     },
-
-    { header: "Supplier", accessor: (row: any) => row.suppliers?.name || "-" },
+    {
+      header: "Sales Order No.",
+      accessor: (row: any) => (row.source_sale_id ? (saleLabels[row.source_sale_id] || row.source_sale_id) : "-"),
+    },
+    { header: "Supplier", accessor: (row: any) => (row.source_sale_id ? (saleSupplierMap[row.source_sale_id] || "-") : "-") },
     { header: "Purchase Date", accessor: (row: any) => format(new Date(row.landing_date), "MMM dd, yyyy") },
     { header: "Total Quantity", accessor: (row: any) => `${row.purchase_quantity ?? row.quantity} ${row.products?.unit_of_measurement || ""}` },
     { header: "Product", accessor: (row: any) => row.products?.species || "-" },
+    {
+      header: "Details",
+      accessor: (row: any) => (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => { setSelectedRow(row); setDetailsOpen(true); }}
+        >
+          View
+        </Button>
+      )
+    },
   ];
 
   return (
@@ -140,12 +161,51 @@ export default function DistributorPurchases() {
           <CardTitle>All Received Products</CardTitle>
         </CardHeader>
         <CardContent>
-          <DataTable 
-            columns={columns} 
-            data={purchases} 
+          <DataTable
+            columns={columns}
+            data={purchases}
           />
         </CardContent>
       </Card>
+      {selectedRow && (
+        <DetailsModal
+          open={detailsOpen}
+          onOpenChange={setDetailsOpen}
+          row={selectedRow}
+          po={poLabels[selectedRow.id] || selectedRow.id}
+          sa={saleLabels[selectedRow.source_sale_id] || selectedRow.source_sale_id}
+          supplier={(selectedRow.source_sale_id && saleSupplierMap[selectedRow.source_sale_id]) || "-"}
+          upstream={saleUpstreamMap[selectedRow.source_sale_id] || {}}
+        />
+      )}
     </div>
+  );
+}
+
+function DetailsModal({ open, onOpenChange, row, po, sa, supplier, upstream }: { open: boolean; onOpenChange: (o: boolean) => void; row: any; po: string; sa: string | null; supplier: string; upstream: any }) {
+  const unit = row?.products?.unit_of_measurement || "";
+  const harvest = row?.harvest_quantity ?? upstream.harvest_quantity ?? upstream.harvest ?? undefined;
+  const purchase = row?.purchase_quantity ?? upstream.purchase_quantity ?? upstream.purchase ?? row?.quantity ?? undefined;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{po}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-1 text-sm">
+          <div><strong>Sales Order No.:</strong> {sa ?? "-"}</div>
+          <div><strong>Supplier:</strong> {supplier || "-"}</div>
+
+          <div><strong>Vessel:</strong> {row?.vessels?.registration_number || "-"}</div>
+          <div><strong>Product:</strong> {row?.products?.species || "-"}</div>
+          {harvest != null && (
+            <div><strong>Harvest Qty:</strong> {`${harvest} ${unit}`}</div>
+          )}
+          <div><strong>Purchase Qty:</strong> {purchase != null ? `${purchase} ${unit}` : "-"}</div>
+
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

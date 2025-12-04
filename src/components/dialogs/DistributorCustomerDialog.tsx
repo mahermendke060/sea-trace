@@ -7,19 +7,19 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-interface SupplierDialogProps {
+interface DistributorCustomerDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  supplier?: any;
+  customer?: any;
   onSuccess: () => void;
 }
 
-export const SupplierDialog = ({ open, onOpenChange, supplier, onSuccess }: SupplierDialogProps) => {
+export const DistributorCustomerDialog = ({ open, onOpenChange, customer, onSuccess }: DistributorCustomerDialogProps) => {
   const { toast } = useToast();
   const [locations, setLocations] = useState<any[]>([]);
   const [formData, setFormData] = useState({
     name: "",
-    type: "harvester",
+    type: "",
     contact_name: "",
     contact_email: "",
     contact_phone: "",
@@ -28,52 +28,50 @@ export const SupplierDialog = ({ open, onOpenChange, supplier, onSuccess }: Supp
 
   useEffect(() => {
     const fetchLocations = async () => {
-      const { data } = await supabase.from("locations").select("*");
+      const { data } = await supabase.from("distributor_locations").select("*");
       setLocations(data || []);
     };
     fetchLocations();
   }, []);
 
   useEffect(() => {
-    if (supplier) {
+    if (customer) {
       setFormData({
-        name: supplier.name || "",
-        type: supplier.type || "harvester",
-        contact_name: supplier.contact_name || "",
-        contact_email: supplier.contact_email || "",
-        contact_phone: supplier.contact_phone || "",
-        location_id: supplier.location_id || "",
+        name: customer.name || "",
+        type: customer.type || "",
+        contact_name: customer.contact_name || "",
+        contact_email: customer.contact_email || "",
+        contact_phone: customer.contact_phone || "",
+        location_id: customer.location_id || "",
       });
     } else {
       setFormData({
         name: "",
-        type: "harvester",
+        type: "",
         contact_name: "",
         contact_email: "",
         contact_phone: "",
         location_id: "",
       });
     }
-  }, [supplier, open]);
+  }, [customer, open]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!formData.type) {
+      toast({ title: "Type required", description: "Please select a customer type." });
+      return;
+    }
+    const payload = { ...formData } as any;
 
-    const { error } = supplier
-      ? await supabase.from("suppliers").update(formData).eq("id", supplier.id)
-      : await supabase.from("suppliers").insert([formData]);
+    const { error } = customer
+      ? await supabase.from("distributor_customers").update(payload).eq("id", customer.id)
+      : await supabase.from("distributor_customers").insert([payload]);
 
     if (error) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: error.message, variant: "destructive" });
     } else {
-      toast({
-        title: "Success",
-        description: `Supplier ${supplier ? "updated" : "created"} successfully`,
-      });
+      toast({ title: "Success", description: `Customer ${customer ? "updated" : "created"} successfully` });
       onSuccess();
       onOpenChange(false);
     }
@@ -83,54 +81,41 @@ export const SupplierDialog = ({ open, onOpenChange, supplier, onSuccess }: Supp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{supplier ? "Edit" : "Add"} Supplier</DialogTitle>
+          <DialogTitle>{customer ? "Edit" : "Add"} Customer</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="name">Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                required
-              />
+              <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="contact_name">Contact Name</Label>
+              <Input id="contact_name" value={formData.contact_name} onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="type">Type *</Label>
               <Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value })}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="harvester">Harvester</SelectItem>
+                  <SelectItem value="restaurant">Restaurant</SelectItem>
+                  <SelectItem value="retailer">Retail</SelectItem>
+                  <SelectItem value="distributor">Distributor</SelectItem>
+                  <SelectItem value="processor">Processor</SelectItem>
+                  <SelectItem value="exporter">Exporter</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="contact_name">Contact Name</Label>
-              <Input
-                id="contact_name"
-                value={formData.contact_name}
-                onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-              />
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="contact_email">Contact Email</Label>
-              <Input
-                id="contact_email"
-                type="email"
-                value={formData.contact_email}
-                onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-              />
+              <Input id="contact_email" type="email" value={formData.contact_email} onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="contact_phone">Contact Phone</Label>
-              <Input
-                id="contact_phone"
-                value={formData.contact_phone}
-                onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-              />
+              <Input id="contact_phone" value={formData.contact_phone} onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="location_id">Location</Label>
@@ -152,12 +137,10 @@ export const SupplierDialog = ({ open, onOpenChange, supplier, onSuccess }: Supp
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit">
-              {supplier ? "Update" : "Create"} Supplier
-            </Button>
+            <Button type="submit">{customer ? "Update" : "Create"} Customer</Button>
           </div>
         </form>
       </DialogContent>
     </Dialog>
   );
-};
+}

@@ -6,6 +6,7 @@ import {
   Anchor, 
   Fish, 
   MapPin,
+  Users,
   ShoppingCart,
   TrendingUp,
   Search,
@@ -23,6 +24,7 @@ const navigation = [
   { name: "Sales", href: "/distributor/sales", icon: TrendingUp },
   { name: "Traceability", href: "/distributor/traceability", icon: Search },
   { name: "Products", href: "/distributor/products", icon: Fish },
+  { name: "Suppliers", href: "/distributor/suppliers", icon: Users },
   { name: "Customers", href: "/distributor/customers", icon: Anchor },
   { name: "Locations", href: "/distributor/locations", icon: MapPin },
 ];
@@ -46,8 +48,8 @@ export const DistributorLayout = ({ children }: { children: React.ReactNode }) =
             </button>
             <Scale className="h-8 w-8" />
             <div>
-              <h1 className="text-2xl font-bold">Distributor Portal</h1>
-              <p className="text-sm text-white/80">Grading & Distribution Management</p>
+              <h1 className="text-2xl font-bold">Cyan Analytics</h1>
+              <p className="text-sm text-white/80">Distribution Management</p>
             </div>
           </div>
         </div>

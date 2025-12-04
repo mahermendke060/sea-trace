@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Plus } from "lucide-react";
 import { DataTable } from "@/components/DataTable";
-import { CustomerDialog } from "@/components/dialogs/CustomerDialog";
+import { DistributorCustomerDialog } from "@/components/dialogs/DistributorCustomerDialog";
 
 export default function DistributorCustomers() {
   const [customers, setCustomers] = useState<any[]>([]);
@@ -12,7 +12,10 @@ export default function DistributorCustomers() {
   const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
 
   const fetchCustomers = async () => {
-    const { data } = await supabase.from("customers").select("*, locations(name)").order("name");
+    const { data } = await supabase
+      .from("distributor_customers")
+      .select("*, distributor_locations(name)")
+      .order("name");
     setCustomers(data || []);
   };
 
@@ -24,12 +27,12 @@ export default function DistributorCustomers() {
     { header: "Contact", accessor: "contact_name" },
     { header: "Email", accessor: "contact_email" },
     { header: "Phone", accessor: "contact_phone" },
-    { header: "Location", accessor: (row: any) => row.locations?.name || "-" },
+    { header: "Location", accessor: (row: any) => row.distributor_locations?.name || "-" },
   ];
 
   const handleDelete = async (customer: any) => {
     if (!confirm(`Delete customer "${customer.name}"?`)) return;
-    await supabase.from("customers").delete().eq("id", customer.id);
+    await supabase.from("distributor_customers").delete().eq("id", customer.id);
     fetchCustomers();
   };
 
@@ -50,7 +53,7 @@ export default function DistributorCustomers() {
           <DataTable columns={columns} data={customers} onEdit={(c) => { setSelectedCustomer(c); setDialogOpen(true); }} onDelete={handleDelete} />
         </CardContent>
       </Card>
-      <CustomerDialog open={dialogOpen} onOpenChange={setDialogOpen} customer={selectedCustomer} onSuccess={fetchCustomers} />
+      <DistributorCustomerDialog open={dialogOpen} onOpenChange={setDialogOpen} customer={selectedCustomer} onSuccess={fetchCustomers} />
     </div>
   );
 }
